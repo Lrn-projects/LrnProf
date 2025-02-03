@@ -11,7 +11,7 @@ const VERSION: &'static str = "0.1.0";
 
 #[derive(Debug, Clone)]
 enum Commands {
-    Run { bin: String },
+    Run { pid: i32 },
     Version,
     Help,
 }
@@ -33,7 +33,13 @@ fn main() {
 
     let command = match args.get(1).map(|s| s.as_str()) {
         Some("run") => Commands::Run {
-            bin: args.get(2).cloned().unwrap_or_else(|| "".to_string()),
+            pid: args
+                .get(2)
+                .and_then(|s| s.parse::<i32>().ok())
+                .unwrap_or_else(|| {
+                    eprintln!("Please provide a valid PID.");
+                    exit(1);
+                }),
         },
         Some("version") => Commands::Version,
         Some("help") => Commands::Help,
@@ -44,7 +50,7 @@ fn main() {
     };
 
     match command {
-        Commands::Run { bin } => profiler::run_profiler(&bin),
+        Commands::Run { pid } => profiler::run_profiler(&pid),
         Commands::Version => utils::command_usage(&rustprof_version()),
         Commands::Help => utils::rustprof_usage(),
     }
