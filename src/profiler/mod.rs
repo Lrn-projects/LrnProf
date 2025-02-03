@@ -11,6 +11,10 @@ pub fn run_profiler(pid: &i32) {
     // fix segfault by expanding the unsafe block into smaller unsafe block
     //Segfault caused by the unsafe block to huge and to much pointer or reference access inside ?
     unsafe {
+        // mach_task_self(): This function returns the task port
+        // for the current process.
+        // Essentially, it provides a reference
+        // to the current process's task.
         let task_pid = task_for_pid(mach_task_self(), *pid, &mut task);
         if task_pid != kernel_success {
             logs::error_log_with_code(
