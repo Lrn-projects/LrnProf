@@ -61,6 +61,6 @@ fn usage_and_exit(msg: String) {
 }
 
 pub fn rustprof_version() -> String {
-    let usage = format!("nyx {VERSION}");
+    let usage = format!("rustprof {VERSION}");
     usage
 }
