@@ -1,5 +1,7 @@
 #![allow(unused_variables)]
+
 use crate::logs;
+use libc::backtrace;
 use libc::exit;
 use mach2::traps::mach_task_self;
 use mach2::traps::task_for_pid;
@@ -7,7 +9,6 @@ embed_plist::embed_info_plist!("../../Info.plist");
 
 pub fn run_profiler(pid: &i32) {
     logs::rp_log("Start running the profiler...");
-    let num_logical_cores: usize = num_cpus::get();
     let mut task: u32 = 0;
 
     // kernel error code
@@ -68,6 +69,13 @@ pub fn run_profiler(pid: &i32) {
             exit(1);
         }
 
+        let mut buf: [*mut libc::c_void; 1024] = [std::ptr::null_mut(); 1024];
+        let sz: libc::c_int = 1024;
+
+        let backtrace = backtrace(buf.as_mut_ptr(), sz);
+
+        // println!("backtrace info {:?}", buf);
+
         // println!("{:?}", thread_info_out);
         println!(
             "user run time: {}.{:06}ms",
@@ -78,7 +86,7 @@ pub fn run_profiler(pid: &i32) {
             thread_info_out[2], thread_info_out[3]
         );
 
-        println!("{}% scaled cpu usage", thread_info_out[4]);
+        println!("cpu usage {}%", thread_info_out[4] as f64 / 10.0);
 
         // let address: u64 = 0; // Define the address
         // let size: u64 = 0; // Define the size
