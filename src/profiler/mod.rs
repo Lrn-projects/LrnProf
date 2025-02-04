@@ -49,7 +49,7 @@ pub fn run_profiler(pid: &i32) {
         let mut thread_info_out_cnt: u32 = 1024; // Define the thread_info_out_cnt
         let thread_info = libc::thread_info(
             *thread_list,
-            thread_id_info,
+            thread_basic_info,
             thread_info_out.as_mut_ptr(),
             &mut thread_info_out_cnt,
         );
@@ -61,7 +61,6 @@ pub fn run_profiler(pid: &i32) {
             );
         }
 
-        // println!("{:?}", thread_info_out);
         for line in thread_info_out {
             if line != 0 {
                 println!("{}", line);
