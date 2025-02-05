@@ -1,7 +1,6 @@
 #![allow(unused_variables)]
 
 use crate::logs;
-use libc::backtrace;
 use libc::exit;
 use mach2::traps::mach_task_self;
 use mach2::traps::task_for_pid;
@@ -68,7 +67,30 @@ pub fn run_profiler(pid: &i32) {
             exit(1);
         }
 
-        let backtrace = backtrace(buf.as_mut_ptr(), sz);
+        let mut new_state: [u32; 1024] = [0; 1024];
+        let mut new_state_count: u32 = 1024;
+        let thread_state = mach2::thread_act::thread_get_state(
+            *thread_list,
+            thread_info,
+            new_state.as_mut_ptr(),
+            &mut new_state_count,
+        );
+
+        println!("thread_State {:?}", new_state.as_mut_ptr());
+
+        let cb = |symbol: &backtrace::Symbol| {
+            println!(
+                "{:?}",
+                symbol
+                    .name()
+                    .unwrap_or_else(|| backtrace::SymbolName::new("unknown".as_bytes()))
+            );
+        };
+        let symbols = backtrace::resolve(new_state.as_mut_ptr() as *mut libc::c_void, cb);
+        println!("{:?}", symbols);
+        // for addr in buf {
+        //     if addr != std::ptr::null_mut() {}
+        // }
     }
     //data output
     println!("threads written: {:?}", thread_list);
