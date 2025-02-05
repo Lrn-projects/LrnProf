@@ -67,6 +67,9 @@ pub fn run_profiler(pid: &i32) {
             exit(1);
         }
 
+        //TODO
+        // make the thread_get_state work
+        // use the correct flavor to get the fp to retrace the stack
         let mut new_state: [u32; 1024] = [0; 1024];
         let mut new_state_count: u32 = 1024;
         let thread_state = mach2::thread_act::thread_get_state(
