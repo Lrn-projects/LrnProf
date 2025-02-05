@@ -69,17 +69,6 @@ pub fn run_profiler(pid: &i32) {
         }
 
         let backtrace = backtrace(buf.as_mut_ptr(), sz);
-
-        // println!("backtrace info {:?}", buf);
-
-        // println!("{:?}", thread_info_out);
-
-        // let address: u64 = 0; // Define the address
-        // let size: u64 = 0; // Define the size
-        // let data: *mut usize = std::ptr::null_mut(); // Define the data pointer
-        // let data_cnt: *mut u32 = std::ptr::null_mut(); // Define the data count
-        // let vm_read = mach2::vm::mach_vm_read(task, address, size, data, data_cnt);
-        // println!("{:?}", data);
     }
     //data output
     println!("threads written: {:?}", thread_list);
@@ -93,4 +82,5 @@ pub fn run_profiler(pid: &i32) {
         thread_info_out[2], thread_info_out[3]
     );
     println!("cpu usage {}%", thread_info_out[4] as f64 / 10.0);
+    // println!("backtrace info {:?}", buf);
 }
