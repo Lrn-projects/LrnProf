@@ -20,11 +20,15 @@ pub fn run_profiler(pid: &i32) {
     // buffer for the thead_info output
     let mut thread_info_out: [i32; 1024] = [0; 1024];
     let mut thread_info_out_cnt: u32 = 1024;
+    // backtrace
+    let mut buf: [*mut libc::c_void; 1024] = [std::ptr::null_mut(); 1024];
+    let sz: libc::c_int = 1024;
 
     // flavor
     let thread_basic_info: u32 = 3;
     let thread_id_info: u32 = 4;
     let thread_extended_info: u32 = 5;
+
     unsafe {
         // mach_task_self(): This function returns the task port
         // for the current process.
@@ -49,11 +53,6 @@ pub fn run_profiler(pid: &i32) {
             exit(1);
         }
 
-        println!(
-            "memory where the threads are written: {:?} number of threads of the given process: {}",
-            thread_list, thread_count
-        );
-
         let thread_info = libc::thread_info(
             *thread_list,
             thread_basic_info,
@@ -69,24 +68,11 @@ pub fn run_profiler(pid: &i32) {
             exit(1);
         }
 
-        let mut buf: [*mut libc::c_void; 1024] = [std::ptr::null_mut(); 1024];
-        let sz: libc::c_int = 1024;
-
         let backtrace = backtrace(buf.as_mut_ptr(), sz);
 
         // println!("backtrace info {:?}", buf);
 
         // println!("{:?}", thread_info_out);
-        println!(
-            "user run time: {}.{:06}ms",
-            thread_info_out[0], thread_info_out[1]
-        );
-        println!(
-            "system time: {}.{:06}ms",
-            thread_info_out[2], thread_info_out[3]
-        );
-
-        println!("cpu usage {}%", thread_info_out[4] as f64 / 10.0);
 
         // let address: u64 = 0; // Define the address
         // let size: u64 = 0; // Define the size
@@ -95,4 +81,16 @@ pub fn run_profiler(pid: &i32) {
         // let vm_read = mach2::vm::mach_vm_read(task, address, size, data, data_cnt);
         // println!("{:?}", data);
     }
+    //data output
+    println!("threads written: {:?}", thread_list);
+    println!("number of threads: {}", thread_count);
+    println!(
+        "user run time: {}.{:06}ms",
+        thread_info_out[0], thread_info_out[1]
+    );
+    println!(
+        "system time: {}.{:06}ms",
+        thread_info_out[2], thread_info_out[3]
+    );
+    println!("cpu usage {}%", thread_info_out[4] as f64 / 10.0);
 }
