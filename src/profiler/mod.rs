@@ -2,6 +2,7 @@
 #![allow(non_snake_case)]
 
 use core::panic;
+use std::ptr;
 
 use crate::logs;
 use libc::exit;
@@ -23,13 +24,21 @@ pub fn run_profiler(pid: &i32) {
     let mut thread_info_out: [i32; 1024] = [0; 1024];
     let mut thread_info_out_cnt: u32 = 1024;
     // backtrace
-    let mut buf: [*mut libc::c_void; 1024] = [std::ptr::null_mut(); 1024];
-    let sz: libc::c_int = 1024;
 
     // flavor
     let thread_basic_info: u32 = 3;
     let thread_id_info: u32 = 4;
     let thread_extended_info: u32 = 5;
+
+    //callback
+    let cb = |symbol: &backtrace::Symbol| {
+        println!(
+            "{:?}",
+            symbol
+                .name()
+                .unwrap_or_else(|| backtrace::SymbolName::new("unknown".as_bytes()))
+        );
+    };
 
     unsafe {
         // mach_task_self(): This function returns the task port
@@ -71,18 +80,11 @@ pub fn run_profiler(pid: &i32) {
             exit(1);
         }
 
-        let test = thread_list;
-
-        println!("prout {:?}", test);
-
-        //TODO
-        // make the thread_get_state work
-        // use the correct flavor to get the fp to retrace the stack
         let mut new_state: [u64; 129] = [0; 129];
         let mut new_state_count: u32 = 129;
         let thread_state = mach2::thread_act::thread_get_state(
             *thread_list,
-            1,
+            6,
             new_state.as_mut_ptr() as *mut _,
             &mut new_state_count,
         );
@@ -90,7 +92,6 @@ pub fn run_profiler(pid: &i32) {
         if thread_state != kernel_success {
             panic!("Thread_State error: {}", thread_state);
         }
-        println!("{:?}", new_state);
         // frame pointer
         let FP = new_state[29];
         // link register (return addr)
@@ -100,29 +101,30 @@ pub fn run_profiler(pid: &i32) {
         // program pointer
         let PC = new_state[32];
 
-        println!("debug FP: {} LR: {} SP: {} PC: {}", FP, LR, SP, PC);
+        println!("{} {} {} {}", FP, LR, SP, PC);
 
-        let backtrace = libc::backtrace(buf.as_mut_ptr(), sz);
+        //unwind loop
+        let mut addresses: Vec<u64> = Vec::new();
 
-        // println!("{:?}", buf);
+        if FP == 0 {
+            panic!("FP is 0 cannot unreferenced");
+        }
+        // convert fp as raw ptr
+        let fp = FP as *const u64;
 
-        // println!("thread_State {:?}", new_state);
+        if !fp.is_null() {
+            println!("debug: {:?}", fp);
+            let next_fp = ptr::read_unaligned(fp) as u64;
+            let next_lr = ptr::read_unaligned(fp.add(1)) as u64;
+            addresses.push(next_lr);
+            println!("Next FP: {:#x}, Next LR: {:#x}", next_fp, next_lr);
+        }
+        let symbols = backtrace::resolve(FP as *mut libc::c_void, cb);
+        println!("symbols: {:?}", symbols);
 
-        let cb = |symbol: &backtrace::Symbol| {
-            println!(
-                "{:?}",
-                symbol
-                    .name()
-                    .unwrap_or_else(|| backtrace::SymbolName::new("unknown".as_bytes()))
-            );
-        };
-        for addr in new_state {
-            if addr != 0 {
-                let hex_addr = addr as usize as *mut libc::c_void;
-                // println!("{:?}", hex_addr);
-                let symbols = backtrace::resolve(hex_addr as *mut libc::c_void, cb);
-                // println!("symbols: {:?}", symbols);
-            }
+        for addr in addresses {
+            let symbols = backtrace::resolve(FP as *mut libc::c_void, cb);
+            println!("symbols: {:?}", symbols);
         }
     }
     //data output
