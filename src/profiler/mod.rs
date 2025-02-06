@@ -1,4 +1,7 @@
 #![allow(unused_variables)]
+#![allow(non_snake_case)]
+
+use core::panic;
 
 use crate::logs;
 use libc::exit;
@@ -42,6 +45,7 @@ pub fn run_profiler(pid: &i32) {
             );
             exit(1);
         }
+
         let task_thread = libc::task_threads(task, &mut thread_list, &mut thread_count);
 
         if task_thread != kernel_success {
@@ -67,19 +71,42 @@ pub fn run_profiler(pid: &i32) {
             exit(1);
         }
 
+        let test = thread_list;
+
+        println!("prout {:?}", test);
+
         //TODO
         // make the thread_get_state work
         // use the correct flavor to get the fp to retrace the stack
-        let mut new_state: [u32; 1024] = [0; 1024];
-        let mut new_state_count: u32 = 1024;
+        let mut new_state: [u64; 129] = [0; 129];
+        let mut new_state_count: u32 = 129;
         let thread_state = mach2::thread_act::thread_get_state(
             *thread_list,
-            thread_info,
-            new_state.as_mut_ptr(),
+            1,
+            new_state.as_mut_ptr() as *mut _,
             &mut new_state_count,
         );
 
-        println!("thread_State {:?}", new_state.as_mut_ptr());
+        if thread_state != kernel_success {
+            panic!("Thread_State error: {}", thread_state);
+        }
+        println!("{:?}", new_state);
+        // frame pointer
+        let FP = new_state[29];
+        // link register (return addr)
+        let LR = new_state[30];
+        // stack pointer
+        let SP = new_state[31];
+        // program pointer
+        let PC = new_state[32];
+
+        println!("debug FP: {} LR: {} SP: {} PC: {}", FP, LR, SP, PC);
+
+        let backtrace = libc::backtrace(buf.as_mut_ptr(), sz);
+
+        // println!("{:?}", buf);
+
+        // println!("thread_State {:?}", new_state);
 
         let cb = |symbol: &backtrace::Symbol| {
             println!(
@@ -89,11 +116,14 @@ pub fn run_profiler(pid: &i32) {
                     .unwrap_or_else(|| backtrace::SymbolName::new("unknown".as_bytes()))
             );
         };
-        let symbols = backtrace::resolve(new_state.as_mut_ptr() as *mut libc::c_void, cb);
-        println!("{:?}", symbols);
-        // for addr in buf {
-        //     if addr != std::ptr::null_mut() {}
-        // }
+        for addr in new_state {
+            if addr != 0 {
+                let hex_addr = addr as usize as *mut libc::c_void;
+                // println!("{:?}", hex_addr);
+                let symbols = backtrace::resolve(hex_addr as *mut libc::c_void, cb);
+                // println!("symbols: {:?}", symbols);
+            }
+        }
     }
     //data output
     println!("threads written: {:?}", thread_list);
