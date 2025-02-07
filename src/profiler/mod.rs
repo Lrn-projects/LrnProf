@@ -109,14 +109,14 @@ pub fn run_profiler(pid: &i32) {
             panic!("FP is 0 cannot unreferenced");
         }
 
-        let fp = FP as *const u64;
+        let fp_ptr = FP as *const u64;
 
-        if FP != 0 {
+        if !fp_ptr.is_null() {
             for i in 0..3 {
-                println!("debug: FP {:#x}", FP);
-                let next_fp = *fp;
+                println!("Trying to read: {:#x}", fp_ptr as u64);
+                let next_fp = *fp_ptr;
                 println!("debug: next_fp {:#x}", next_fp);
-                let next_lr = (*fp + 8) as u64;
+                let next_lr = (*fp_ptr + 8) as u64;
 
                 addresses.push(next_lr);
                 let current_fp = FP;
