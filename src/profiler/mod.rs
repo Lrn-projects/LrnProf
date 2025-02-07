@@ -2,7 +2,6 @@
 #![allow(non_snake_case)]
 
 use core::panic;
-use std::ptr;
 
 use crate::logs;
 use libc::exit;
@@ -93,7 +92,7 @@ pub fn run_profiler(pid: &i32) {
             panic!("Thread_State error: {}", thread_state);
         }
         // frame pointer
-        let FP = new_state[29];
+        let mut FP = new_state[29];
         // link register (return addr)
         let LR = new_state[30];
         // stack pointer
@@ -109,25 +108,28 @@ pub fn run_profiler(pid: &i32) {
         if FP == 0 {
             panic!("FP is 0 cannot unreferenced");
         }
-        // convert fp as raw ptr
-        let mut fp = FP as *const u64;
 
-        if !fp.is_null() {
-            for i in 0..1 {
-                println!("debug: FP {:?}", fp);
-                let next_fp = fp as u64;
-                println!("debug: next_fp {:?}", next_fp);
-                let next_lr = (fp as u64) + 8;
+        let fp = FP as *const u64;
+
+        if FP != 0 {
+            for i in 0..3 {
+                println!("debug: FP {:#x}", FP);
+                let next_fp = *fp;
+                println!("debug: next_fp {:#x}", next_fp);
+                let next_lr = (*fp + 8) as u64;
+
                 addresses.push(next_lr);
-                println!("Next FP: {:#x}, Next LR: {:#x}", next_fp, next_lr);
-                // fp = *(next_fp as *const u64) as *const u64;
+                let current_fp = FP;
+                FP = next_fp;
+                println!("Next FP: {:#x}, Next LR: {:#x}", current_fp, next_lr);
+                if next_fp == 0 {
+                    panic!("Invalid frame pointer: {:#x}", next_fp);
+                }
             }
         }
-        let symbols = backtrace::resolve(FP as *mut libc::c_void, cb);
-        println!("symbols: {:?}", symbols);
 
         for addr in addresses {
-            let symbols = backtrace::resolve(FP as *mut libc::c_void, cb);
+            let symbols = backtrace::resolve(addr as *mut libc::c_void, cb);
             println!("symbols: {:?}", symbols);
         }
     }
