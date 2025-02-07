@@ -110,14 +110,18 @@ pub fn run_profiler(pid: &i32) {
             panic!("FP is 0 cannot unreferenced");
         }
         // convert fp as raw ptr
-        let fp = FP as *const u64;
+        let mut fp = FP as *const u64;
 
         if !fp.is_null() {
-            println!("debug: {:?}", fp);
-            let next_fp = ptr::read_unaligned(fp) as u64;
-            let next_lr = ptr::read_unaligned(fp.add(1)) as u64;
-            addresses.push(next_lr);
-            println!("Next FP: {:#x}, Next LR: {:#x}", next_fp, next_lr);
+            for i in 0..1 {
+                println!("debug: FP {:?}", fp);
+                let next_fp = fp as u64;
+                println!("debug: next_fp {:?}", next_fp);
+                let next_lr = (fp as u64) + 8;
+                addresses.push(next_lr);
+                println!("Next FP: {:#x}, Next LR: {:#x}", next_fp, next_lr);
+                // fp = *(next_fp as *const u64) as *const u64;
+            }
         }
         let symbols = backtrace::resolve(FP as *mut libc::c_void, cb);
         println!("symbols: {:?}", symbols);
