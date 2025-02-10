@@ -93,7 +93,7 @@ pub fn run_profiler(pid: &i32) {
         if thread_state != kernel_success {
             panic!("Thread_State error: {}", thread_state);
         }
-        // frame pointer
+        // addr pointer
         let mut FP = new_state[29];
         // link register (return addr)
         let LR = new_state[30];
@@ -101,8 +101,6 @@ pub fn run_profiler(pid: &i32) {
         let SP = new_state[31];
         // program pointer
         let PC = new_state[32];
-
-        println!("{} {} {} {}", FP, LR, SP, PC);
 
         //unwind loop
         let mut addresses: Vec<u64> = Vec::new();
@@ -130,17 +128,14 @@ pub fn run_profiler(pid: &i32) {
                 addresses.push(next_lr);
                 let current_fp = FP;
                 FP = next_fp;
-                println!("Next FP: {:#x}, Next LR: {:#x}", current_fp, next_lr);
+                // println!("Next FP: {:#x}, Next LR: {:#x}", current_fp, next_lr);
                 if next_fp == 0 {
                     break;
                 }
             }
         }
 
-        for addr in addresses {
-            let symbols = backtrace::resolve(addr as *mut libc::c_void, cb);
-            println!("symbols: {:?}", symbols);
-        }
+        for addr in addresses {}
     }
     //data output
     println!("threads written: {:?}", thread_list);
