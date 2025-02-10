@@ -4,7 +4,7 @@
 use core::panic;
 
 use crate::logs;
-use libc::backtrace_from_fp;
+use backtrace::Symbol;
 use libc::exit;
 use mach2::traps::mach_task_self;
 use mach2::traps::task_for_pid;
@@ -117,25 +117,22 @@ pub fn run_profiler(pid: &i32) {
         let size: usize = array.len();
 
         if !fp_ptr.is_null() {
-            for i in 0..3 {
+            loop {
                 let pid_i32 = *pid as i32;
                 let mut bytes_buffer = [0; 128];
                 let test = test(pid_i32, FP as usize, size, &mut bytes_buffer).unwrap();
-                println!("{:?}", bytes_buffer);
-                let read = backtrace_from_fp(
-                    fp_ptr as *mut libc::c_void,
-                    &thread_list as *const _ as *mut *mut libc::c_void,
-                    size as i32,
-                );
-                let next_fp = std::ptr::read(fp_ptr);
-                println!("debug: next_fp {:#x}", next_fp);
-                let next_lr = std::ptr::read(fp_ptr.add(1));
+                let mut next_fp_bytes_vec = [0u8; 8];
+                let mut next_lr_bytes_vec = [0u8; 8];
+                next_fp_bytes_vec.copy_from_slice(&bytes_buffer[..8]);
+                next_lr_bytes_vec.copy_from_slice(&bytes_buffer[8..16]);
+                let next_fp = u64::from_le_bytes(next_fp_bytes_vec);
+                let next_lr = u64::from_le_bytes(next_lr_bytes_vec);
                 addresses.push(next_lr);
                 let current_fp = FP;
                 FP = next_fp;
                 println!("Next FP: {:#x}, Next LR: {:#x}", current_fp, next_lr);
                 if next_fp == 0 {
-                    panic!("Invalid frame pointer: {:#x}", next_fp);
+                    break;
                 }
             }
         }
