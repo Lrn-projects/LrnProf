@@ -4,12 +4,12 @@
 use core::panic;
 
 use crate::logs;
-use backtrace::Symbol;
 use libc::exit;
 use mach2::traps::mach_task_self;
 use mach2::traps::task_for_pid;
 use read_process_memory::*;
 embed_plist::embed_info_plist!("../../Info.plist");
+mod parser;
 
 pub fn run_profiler(pid: &i32) {
     logs::rp_log("Start running the profiler...");

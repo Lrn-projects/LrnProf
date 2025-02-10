@@ -1,4 +1,4 @@
-use std::process::exit;
+use std::process::{Command, exit};
 
 pub fn command_usage(usage: &str) {
     println!("{}", usage);
@@ -24,4 +24,18 @@ Options:
 ";
 
     println!("{}", usage);
+}
+
+pub fn get_bin_path(pid: i32) -> String {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "lsof -p {} | awk '$4 == \"txt\" {{ print $9 }}'",
+            pid
+        ))
+        .output()
+        .expect("Failed to execute command");
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    let parts: Vec<&str> = output_str.split('\n').collect();
+    parts[0].to_string()
 }
