@@ -4,9 +4,11 @@
 use core::panic;
 
 use crate::logs;
+use libc::backtrace_from_fp;
 use libc::exit;
 use mach2::traps::mach_task_self;
 use mach2::traps::task_for_pid;
+use read_process_memory::*;
 embed_plist::embed_info_plist!("../../Info.plist");
 
 pub fn run_profiler(pid: &i32) {
@@ -111,13 +113,23 @@ pub fn run_profiler(pid: &i32) {
 
         let fp_ptr = FP as *const u64;
 
+        let array: [u64; 128] = [0; 128];
+        let size: usize = array.len();
+
         if !fp_ptr.is_null() {
             for i in 0..3 {
-                println!("Trying to read: {:#x}", fp_ptr as u64);
-                let next_fp = *fp_ptr;
+                let pid_i32 = *pid as i32;
+                let mut bytes_buffer = [0; 128];
+                let test = test(pid_i32, FP as usize, size, &mut bytes_buffer).unwrap();
+                println!("{:?}", bytes_buffer);
+                let read = backtrace_from_fp(
+                    fp_ptr as *mut libc::c_void,
+                    &thread_list as *const _ as *mut *mut libc::c_void,
+                    size as i32,
+                );
+                let next_fp = std::ptr::read(fp_ptr);
                 println!("debug: next_fp {:#x}", next_fp);
-                let next_lr = (*fp_ptr + 8) as u64;
-
+                let next_lr = std::ptr::read(fp_ptr.add(1));
                 addresses.push(next_lr);
                 let current_fp = FP;
                 FP = next_fp;
@@ -146,4 +158,15 @@ pub fn run_profiler(pid: &i32) {
     );
     println!("cpu usage {}%", thread_info_out[4] as f64 / 10.0);
     // println!("backtrace info {:?}", buf);
+}
+
+fn test(pid: Pid, address: usize, size: usize, buff: *mut [u8; 128]) -> std::io::Result<()> {
+    let handle: ProcessHandle = pid.try_into()?;
+    let bytes = copy_address(address, size, &handle)?;
+    for i in &bytes {
+        if let Some(buff_ref) = unsafe { buff.as_mut() } {
+            *buff_ref = bytes.clone().try_into().unwrap();
+        }
+    }
+    Ok(())
 }
