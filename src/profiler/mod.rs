@@ -114,9 +114,10 @@ pub fn run_profiler(pid: &i32) {
         let array: [u64; 128] = [0; 128];
         let size: usize = array.len();
 
+        let pid_i32 = *pid as i32;
+        parser::parse_bin(*pid);
         if !fp_ptr.is_null() {
             loop {
-                let pid_i32 = *pid as i32;
                 let mut bytes_buffer = [0; 128];
                 let test = test(pid_i32, FP as usize, size, &mut bytes_buffer).unwrap();
                 let mut next_fp_bytes_vec = [0u8; 8];
