@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufReader, Read},
+    io::{BufReader, Bytes, Read},
     path::Path,
 };
 
@@ -22,7 +22,9 @@ pub fn parse_bin(pid: i32) {
     }
     // read the magic number of the binary to find the format
     // match the binary format in little endian
-    if bytes_vec.len() >= 4 && &bytes_vec[0..4] == [0xCF, 0xFA, 0xED, 0xFE] {
+    if bytes_vec.len() >= 4 && &bytes_vec[0..4] == [0xCF, 0xFA, 0xED, 0xFE]
+        || bytes_vec.len() >= 4 && &bytes_vec[0..4] == [0xCE, 0xFA, 0xED, 0xFE]
+    {
         logs::info_log("Binary format is Mach-O".to_string());
     }
     // let decoded: Result<String, _> = bincode::deserialize(&bytes_vec);
