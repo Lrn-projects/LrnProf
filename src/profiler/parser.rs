@@ -1,10 +1,29 @@
 use std::{
     fs::File,
-    io::{BufReader, Bytes, Read},
+    io::{BufReader, Read},
     path::Path,
 };
 
 // use bincode::{self};
+
+const MAGIC_ARM64: u64 = 0xfeedfacf;
+
+//structure of the Mach-O (Mach object) file format in 64 bits
+
+struct MachOBinary {
+    header: MachOHeader,
+}
+
+struct MachOHeader {
+    format: u64,
+}
+
+struct MachOLoadCommands {
+    symbolTable: String,
+    dynamicSymbolTable: String,
+}
+
+use nom::bytes;
 
 use crate::{logs, utils};
 
