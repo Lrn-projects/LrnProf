@@ -43,7 +43,7 @@ pub fn parse_bin(pid: i32) {
     // read the magic number of the binary to find the format
     // match the binary format in little endian
     let s: MachOBinary = unsafe { std::ptr::read(bytes_vec.as_ptr() as *const _) };
-    if s.header.format == 0xfeedfacf {
+    if s.header.format == 0xfeedfacf || s.header.format == 0xfeedface {
         logs::info_log("Binary format is Mach-O".to_string());
     }
     // let decoded: Result<String, _> = bincode::deserialize(&bytes_vec);
