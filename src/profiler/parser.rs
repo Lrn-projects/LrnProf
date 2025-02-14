@@ -8,16 +8,14 @@ use std::{
     path::Path,
 };
 
-//struct of the Mach-O (Mach object) file magic in 64 bits
 #[derive(Debug)]
 struct MachOBinary {
-    loadCommand: Vec<MachOLoadCommands>,
+    loadCommand: Vec<LoadCommand>,
 }
 
-// struct of the Mach-O header
 #[derive(Debug)]
 #[allow(dead_code)]
-struct MachOHeader {
+struct MachHeader64 {
     magic: u32,
     cpuType: u32,
     cpuSubType: u32,
@@ -28,29 +26,30 @@ struct MachOHeader {
     reserved: u32,
 }
 
-// struct of the Mach-O Load Commands
 #[derive(Debug, Clone, Copy)]
-struct MachOLoadCommands {
+struct LoadCommand {
     cmd: u32,
     cmdsize: u32,
 }
 
 #[allow(dead_code)]
-struct SegmentCommands {
-    cmd: u32,
-    cmdsize: u32,
-    segname: char,
-}
-
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
-struct MachOLCSymtabCommand {
+struct SymtabCommand {
     cmd: u32,
     cmdsize: u32,
     symoff: u32,
     nsyms: u32,
     stroff: u32,
     strsize: u32,
+}
+
+#[derive(Debug)]
+struct Nlist64 {
+    n_strx: u32,
+    n_type: u8,
+    n_sect: u8,
+    n_desc: u16,
+    n_value: u64,
 }
 
 use crate::{logs, utils};
@@ -69,11 +68,11 @@ pub fn parse_bin(pid: i32) {
         bytes_vec.push(byte);
     }
     // read the header size and return the size in octets
-    let header_size = std::mem::size_of::<MachOHeader>();
+    let header_size = std::mem::size_of::<MachHeader64>();
     // fetch only the header from the whole binary
     let header_bytes = &bytes_vec[..header_size];
-    // convert into the MachOHeader struct
-    let header: MachOHeader = unsafe { std::ptr::read(header_bytes.as_ptr() as *const _) };
+    // convert into the MachHeader64 struct
+    let header: MachHeader64 = unsafe { std::ptr::read(header_bytes.as_ptr() as *const _) };
 
     // read the magic number of the binary to find the magic
     // match the binary magic in little endian
@@ -95,15 +94,15 @@ pub fn parse_bin(pid: i32) {
             // Unsafe operation: Direct memory reading without validity checks.
             //
             // We get a pointer to the bytes starting at `offset` within `load_commands_bytes`.
-            // `as_ptr()` gives a `*const u8`, which we cast to `*const MachOLoadCommands`
-            // to tell the compiler: "These bytes represent a MachOLoadCommands structure."
+            // `as_ptr()` gives a `*const u8`, which we cast to `*const LoadCommand`
+            // to tell the compiler: "These bytes represent a LoadCommand structure."
             //
-            // Then, `std::ptr::read(...)` reads these bytes and interprets them as a `MachOLoadCommands`.
-            // If the bytes do not exactly match a `MachOLoadCommands` structure, this leads to **Undefined Behavior**.
+            // Then, `std::ptr::read(...)` reads these bytes and interprets them as a `LoadCommand`.
+            // If the bytes do not exactly match a `LoadCommand` structure, this leads to **Undefined Behavior**.
             //
-            // Safer alternative: Check that `offset + size_of::<MachOLoadCommands>() <= load_commands_bytes.len()`
+            // Safer alternative: Check that `offset + size_of::<LoadCommand>() <= load_commands_bytes.len()`
             // before performing this conversion.
-            let cmd: MachOLoadCommands =
+            let cmd: LoadCommand =
                 unsafe { std::ptr::read(load_commands_bytes[offset..].as_ptr() as *const _) };
             // get the size of the current load_command
             let cmdsize = cmd.cmdsize;
@@ -126,8 +125,8 @@ pub fn parse_bin(pid: i32) {
                 let lc_symtab_offset_index = offset_map.iter().position(|x| x.0 == 2);
                 // get the value corresponding to the index
                 let lc_symtab_offset = offset_map[6].1;
-                // cast the MachOLCSymtabCommand struct from the load_commands_bytes vector using the offset index
-                let symtab_cmd: MachOLCSymtabCommand = unsafe {
+                // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
+                let symtab_cmd: SymtabCommand = unsafe {
                     std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
                 };
                 println!("offset: {:?}", symtab_cmd);
