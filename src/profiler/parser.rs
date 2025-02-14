@@ -1,28 +1,39 @@
+// binary file parser
+// iterate over the binary straightforward to find the intended data
+// https://github.com/aidansteele/osx-abi-macho-file-format-reference
+
 use std::{
     fs::File,
     io::{BufReader, Read},
     path::Path,
 };
 
-// use bincode::{self};
-
-//structure of the Mach-O (Mach object) file format in 64 bits
+//struct of the Mach-O (Mach object) file magic in 64 bits
 #[derive(Debug)]
 struct MachOBinary {
-    header: MachOHeader,
+    loadCommand: Vec<MachOLoadCommands>,
 }
 
+// struct of the Mach-O header
 #[derive(Debug)]
+#[allow(dead_code)]
 struct MachOHeader {
-    format: u32,
+    magic: u32,
+    cpuType: u32,
+    cpuSubType: u32,
+    filetype: u32,
+    ncmds: u32,
+    sizeofcmds: u32,
+    flags: u32,
+    reserved: u32,
 }
 
+// struct of the Mach-O Load Commands
+#[derive(Debug)]
 struct MachOLoadCommands {
-    symbolTable: String,
-    dynamicSymbolTable: String,
+    cmd: u32,
+    cmdsize: u32,
 }
-
-use nom::bytes;
 
 use crate::{logs, utils};
 
@@ -33,16 +44,66 @@ pub fn parse_bin(pid: i32) {
     }
     logs::info_log("Binary found".to_string());
     let my_buf = BufReader::new(File::open(output).unwrap());
+    // vector containing the whole binary
     let mut bytes_vec: Vec<u8> = Vec::new();
     for byte_or_error in my_buf.bytes() {
         let byte = byte_or_error.unwrap();
         bytes_vec.push(byte);
     }
-    // read the magic number of the binary to find the format
-    // match the binary format in little endian
-    let s: MachOBinary = unsafe { std::ptr::read(bytes_vec.as_ptr() as *const _) };
-    if s.header.format == 0xfeedfacf || s.header.format == 0xfeedface {
-        logs::info_log("Binary format is Mach-O".to_string());
+    // read the header size and return the size in octets
+    let header_size = std::mem::size_of::<MachOHeader>();
+    // fetch only the header from the whole binary
+    let header_bytes = &bytes_vec[..header_size];
+    // convert into the MachOHeader struct
+    let header: MachOHeader = unsafe { std::ptr::read(header_bytes.as_ptr() as *const _) };
+
+    // read the magic number of the binary to find the magic
+    // match the binary magic in little endian
+    if header.magic == 0xfeedfacf || header.magic == 0xfeedface {
+        logs::info_log("Binary magic is Mach-O".to_string());
+        // get the total size of load command
+        let load_commands_size = header.sizeofcmds as usize;
+        // extract bytes from load commands
+        // get only the load commands from the bytes
+        let load_commands_bytes = &bytes_vec[header_size..header_size + load_commands_size];
+        // will contain all the load_commands
+        let mut load_commands = Vec::new();
+        // init the offset to iter over the load_commands
+        let mut offset = 0;
+        // loop to read all the load_commands
+        while offset < load_commands_size {
+            // Unsafe operation: Direct memory reading without validity checks.
+            //
+            // We get a pointer to the bytes starting at `offset` within `load_commands_bytes`.
+            // `as_ptr()` gives a `*const u8`, which we cast to `*const MachOLoadCommands`
+            // to tell the compiler: "These bytes represent a MachOLoadCommands structure."
+            //
+            // Then, `std::ptr::read(...)` reads these bytes and interprets them as a `MachOLoadCommands`.
+            // If the bytes do not exactly match a `MachOLoadCommands` structure, this leads to **Undefined Behavior**.
+            //
+            // Safer alternative: Check that `offset + size_of::<MachOLoadCommands>() <= load_commands_bytes.len()`
+            // before performing this conversion.
+            let cmd: MachOLoadCommands =
+                unsafe { std::ptr::read(load_commands_bytes[offset..].as_ptr() as *const _) };
+            // get the size of the current load_command
+            let cmdsize = cmd.cmdsize;
+            // add the current load_command to the vector
+            load_commands.push(cmd);
+            // move the offset forward to get the next load_command
+            offset += cmdsize as usize;
+        }
+        // create a struct containing all the load_command
+        let s = MachOBinary {
+            loadCommand: load_commands,
+        };
+        // iterate over the struct load_command
+        for i in s.loadCommand {
+            // found the symbols table
+            if i.cmd == 2 {
+                println!("Found load command with cmd value 2");
+                break;
+            }
+        }
     }
     // let decoded: Result<String, _> = bincode::deserialize(&bytes_vec);
     // match decoded {
