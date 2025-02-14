@@ -9,13 +9,14 @@ use std::{
 const MAGIC_ARM64: u64 = 0xfeedfacf;
 
 //structure of the Mach-O (Mach object) file format in 64 bits
-
+#[derive(Debug)]
 struct MachOBinary {
     header: MachOHeader,
 }
 
+#[derive(Debug)]
 struct MachOHeader {
-    format: u64,
+    format: u32,
 }
 
 struct MachOLoadCommands {
@@ -41,9 +42,8 @@ pub fn parse_bin(pid: i32) {
     }
     // read the magic number of the binary to find the format
     // match the binary format in little endian
-    if bytes_vec.len() >= 4 && &bytes_vec[0..4] == [0xCF, 0xFA, 0xED, 0xFE]
-        || bytes_vec.len() >= 4 && &bytes_vec[0..4] == [0xCE, 0xFA, 0xED, 0xFE]
-    {
+    let s: MachOBinary = unsafe { std::ptr::read(bytes_vec.as_ptr() as *const _) };
+    if s.header.format == 0xfeedfacf {
         logs::info_log("Binary format is Mach-O".to_string());
     }
     // let decoded: Result<String, _> = bincode::deserialize(&bytes_vec);
