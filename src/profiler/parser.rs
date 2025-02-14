@@ -29,10 +29,28 @@ struct MachOHeader {
 }
 
 // struct of the Mach-O Load Commands
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct MachOLoadCommands {
     cmd: u32,
     cmdsize: u32,
+}
+
+#[allow(dead_code)]
+struct SegmentCommands {
+    cmd: u32,
+    cmdsize: u32,
+    segname: char,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+struct MachOLCSymtabCommand {
+    cmd: u32,
+    cmdsize: u32,
+    symoff: u32,
+    nsyms: u32,
+    stroff: u32,
+    strsize: u32,
 }
 
 use crate::{logs, utils};
@@ -70,6 +88,8 @@ pub fn parse_bin(pid: i32) {
         let mut load_commands = Vec::new();
         // init the offset to iter over the load_commands
         let mut offset = 0;
+        // store all the offset of the binary when iter over the load_commands_size
+        let mut offset_map = Vec::new();
         // loop to read all the load_commands
         while offset < load_commands_size {
             // Unsafe operation: Direct memory reading without validity checks.
@@ -89,10 +109,11 @@ pub fn parse_bin(pid: i32) {
             let cmdsize = cmd.cmdsize;
             // add the current load_command to the vector
             load_commands.push(cmd);
+            // push the current offset to the map
+            offset_map.push((cmd.cmd, offset));
             // move the offset forward to get the next load_command
             offset += cmdsize as usize;
         }
-        // create a struct containing all the load_command
         let s = MachOBinary {
             loadCommand: load_commands,
         };
@@ -101,13 +122,23 @@ pub fn parse_bin(pid: i32) {
             // found the symbols table
             if i.cmd == 2 {
                 println!("Found load command with cmd value 2");
+                // get the offset_map index matching the symtab int
+                let lc_symtab_offset_index = offset_map.iter().position(|x| x.0 == 2);
+                // get the value corresponding to the index
+                let lc_symtab_offset = offset_map[6].1;
+                // cast the MachOLCSymtabCommand struct from the load_commands_bytes vector using the offset index
+                let symtab_cmd: MachOLCSymtabCommand = unsafe {
+                    std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
+                };
+                println!("offset: {:?}", symtab_cmd);
                 break;
             }
         }
     }
-    // let decoded: Result<String, _> = bincode::deserialize(&bytes_vec);
-    // match decoded {
-    //     Ok(data) => println!("{:?}", data),
-    //     Err(e) => println!("Deserialization error: {:?}", e),
-    // }
+    // create a struct containing all the load_command
 }
+// let decoded: Result<String, _> = bincode::deserialize(&bytes_vec);
+// match decoded {
+//     Ok(data) => println!("{:?}", data),
+//     Err(e) => println!("Deserialization error: {:?}", e),
+// }
