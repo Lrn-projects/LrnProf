@@ -6,8 +6,6 @@ use std::{
 
 // use bincode::{self};
 
-const MAGIC_ARM64: u64 = 0xfeedfacf;
-
 //structure of the Mach-O (Mach object) file format in 64 bits
 #[derive(Debug)]
 struct MachOBinary {
