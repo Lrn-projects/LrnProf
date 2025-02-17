@@ -46,6 +46,10 @@ pub fn run_profiler(pid: &i32) {
     //unwind loop
     let mut addresses: Vec<u64> = Vec::new();
 
+    // binary based address
+    #[allow(unused_assignments)]
+    let mut bin_loaded_addr: u64 = 0;
+
     //callback
     let cb = |symbol: &backtrace::Symbol| {
         println!(
@@ -122,7 +126,6 @@ pub fn run_profiler(pid: &i32) {
         let fp_ptr = FP as *const u64;
 
         let pid_i32 = *pid as i32;
-        parser::parse_bin(*pid);
         if !fp_ptr.is_null() {
             loop {
                 let read_process_address = read_process_address(
@@ -149,10 +152,11 @@ pub fn run_profiler(pid: &i32) {
             }
         }
 
-        for addr in addresses {}
+        bin_loaded_addr = get_binary_based_addr(task);
+        parser::parse_bin_file(*pid, addresses, bin_loaded_addr);
     }
     //data output
-    println!("threads written: {:?}", thread_list);
+    println!("binary loaded at: {:#x}", bin_loaded_addr);
     println!("number of threads: {}", thread_count);
     println!(
         "user run time: {}.{:06}ms",
@@ -200,4 +204,42 @@ fn read_process_address(
         }
     }
     Ok(())
+}
+
+/// The function `get_binary_based_addr` retrieves the base address of a binary in a target task using
+/// low-level Rust code.
+///
+/// Arguments:
+///
+/// * `target_task`: The `target_task` parameter is the task for which you want to retrieve the
+/// binary-based address. This task is typically a process or application running on the system. The
+/// function `get_binary_based_addr` uses this parameter to query the virtual memory region information
+/// of the specified task and extract the base address
+///
+/// Returns:
+///
+/// The function `get_binary_based_addr` returns the memory address of the specified target task in
+/// binary format as a `u64` value.
+fn get_binary_based_addr(target_task: u32) -> u64 {
+    let mut address: mach2::vm_types::mach_vm_address_t = 0;
+    let mut size: mach2::vm_types::mach_vm_size_t = 0;
+    let flavor: i32 = 9;
+    let mut info: mach2::vm_region::vm_region_basic_info_64 = unsafe { std::mem::zeroed() };
+    let mut infoCnt: mach2::message::mach_msg_type_number_t =
+        std::mem::size_of::<mach2::vm_region::vm_region_basic_info_64>() as u32;
+    let mut object_name: mach2::port::mach_port_t = 0;
+
+    unsafe {
+        let base_addr = mach2::vm::mach_vm_region(
+            target_task,
+            &mut address,
+            &mut size,
+            flavor,
+            &mut info as *mut _ as *mut _,
+            &mut infoCnt,
+            &mut object_name,
+        );
+    }
+
+    address
 }

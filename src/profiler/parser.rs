@@ -7,6 +7,8 @@ use std::{
     io::{BufReader, Read},
     path::Path,
 };
+use symbolic_common::{Language, Name};
+use symbolic_demangle::{Demangle, DemangleOptions};
 
 #[derive(Debug)]
 struct MachOBinary {
@@ -82,7 +84,7 @@ struct Nlist64 {
 
 use crate::{logs, utils};
 
-pub fn parse_bin(pid: i32) {
+pub fn parse_bin_file(pid: i32, addr: Vec<u64>, base_addr: u64) {
     let output = utils::get_bin_path(pid);
     if !Path::new(&output).exists() {
         logs::error_log("Cannot find the binary of the process".to_string());
@@ -197,7 +199,7 @@ pub fn parse_bin(pid: i32) {
     // loop over each symtab entries and resolve each symbols
     for each in &symtab_vec {
         let strx_offset = each.n_strx as usize;
-
+        let dyn_sym_off = base_addr + each.n_value;
         let mut symbol_name = String::new();
         let mut i = strx_offset;
 
@@ -205,9 +207,18 @@ pub fn parse_bin(pid: i32) {
             symbol_name.push(string_table[i] as char);
             i += 1;
         }
-
-        symbol_names.push(symbol_name);
+        if symbol_name != "" {
+            let symbol_name_demangle = Name::from(symbol_name);
+            if symbol_name_demangle.detect_language() != Language::Unknown {
+                symbol_names.push(
+                    symbol_name_demangle
+                        .try_demangle(DemangleOptions::name_only())
+                        .to_string(),
+                );
+            }
+        }
     }
-    symbol_names.retain(|x| x != "");
-    println!("{:?}", symbol_names);
+    // println!("{:?}", symbol_names);
 }
+
+// pub fn parse_bin_execution(pid: i32, addr: u64) {}
