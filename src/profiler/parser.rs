@@ -27,6 +27,7 @@ struct MachHeader64 {
 }
 
 #[derive(Debug, Clone, Copy)]
+// one entry from the load command
 struct LoadCommand {
     cmd: u32,
     cmdsize: u32,
