@@ -63,10 +63,8 @@ struct LoadCommand {
 struct SymtabCommand {
     cmd: u32,
     cmdsize: u32,
-    // symbol table offset
     symoff: u32,
     nsyms: u32,
-    // string table offset
     stroff: u32,
     strsize: u32,
 }
@@ -103,6 +101,19 @@ pub fn parse_bin(pid: i32) {
     let header_bytes = &bytes_vec[..header_size];
     // convert into the MachHeader64 struct
     let header: MachHeader64 = unsafe { std::ptr::read(header_bytes.as_ptr() as *const _) };
+
+    // init symtab command instance
+    let mut symtab_cmd: SymtabCommand = SymtabCommand {
+        cmd: 0,
+        cmdsize: 0,
+        symoff: 0,
+        nsyms: 0,
+        stroff: 0,
+        strsize: 0,
+    };
+
+    // create a vector containing all symtab entries
+    let mut symtab_vec: Vec<Nlist64> = Vec::new();
 
     // read the magic number of the binary to find the magic
     // match the binary magic in little endian
@@ -157,7 +168,7 @@ pub fn parse_bin(pid: i32) {
                 let lc_symtab_offset = offset_map[6].1;
                 // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
                 // to read the lc_symtab command properties
-                let symtab_cmd: SymtabCommand = unsafe {
+                symtab_cmd = unsafe {
                     std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
                 };
                 // loop over the all symtab to get all entries
@@ -169,26 +180,33 @@ pub fn parse_bin(pid: i32) {
                     let symtab: Nlist64 = unsafe {
                         std::ptr::read(bytes_vec[symbol_offset as usize..].as_ptr() as *const _)
                     };
-                    println!("{:?}", symtab);
+                    if symtab.n_strx != 0 {
+                        symtab_vec.push(symtab);
+                    }
                 }
-                let mut symbol_resolve_map: Vec<(u32, usize)> = Vec::new();
-                // loop over the string table and resolve each symbols
-                for i in &bytes_vec
-                    [symtab_cmd.stroff as usize..(symtab_cmd.stroff + symtab_cmd.strsize) as usize]
-                {
-                    // let strx = symtab.n_strx as usize;
-                    // for i in
-                    // symbol_resolve_map.push(());
-                }
-                // println!("offset: {:?}", string_table);
                 break;
             }
         }
     }
-    // create a struct containing all the load_command
+    // create a buffer containing all string table element
+    let string_table =
+        &bytes_vec[symtab_cmd.stroff as usize..(symtab_cmd.stroff + symtab_cmd.strsize) as usize];
+
+    let mut symbol_names: Vec<String> = Vec::new();
+    // loop over each symtab entries and resolve each symbols
+    for each in &symtab_vec {
+        let strx = each.n_strx as usize;
+
+        let mut symbol_name = String::new();
+        let mut i = strx;
+
+        while i < string_table.len() && string_table[i] != 0 {
+            symbol_name.push(string_table[i] as char);
+            i += 1;
+        }
+
+        symbol_names.push(symbol_name);
+    }
+    symbol_names.retain(|x| x != "");
+    println!("{:?}", symbol_names);
 }
-// let decoded: Result<String, _> = bincode::deserialize(&bytes_vec);
-// match decoded {
-//     Ok(data) => println!("{:?}", data),
-//     Err(e) => println!("Deserialization error: {:?}", e),
-// }
