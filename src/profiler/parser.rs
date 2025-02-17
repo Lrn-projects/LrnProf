@@ -15,6 +15,7 @@ struct MachOBinary {
 
 #[derive(Debug)]
 #[allow(dead_code)]
+// header of a mach-o 64 binary
 struct MachHeader64 {
     magic: u32,
     cpuType: u32,
@@ -27,7 +28,7 @@ struct MachHeader64 {
 }
 
 #[derive(Debug, Clone, Copy)]
-// one entry from the load command
+// structure for one entry of the load command
 struct LoadCommand {
     cmd: u32,
     cmdsize: u32,
@@ -35,6 +36,30 @@ struct LoadCommand {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
+
+/// The `SymtabCommand` struct represents a command in a Mach-O file format that contains information
+/// about symbol and string table offsets.
+///
+/// Properties:
+///
+/// * `cmd`: The `cmd` field in the `SymtabCommand` struct represents the type of load command. It
+/// specifies the type of command that this structure represents in a Mach-O file.
+/// * `cmdsize`: The `cmdsize` property in the `SymtabCommand` struct represents the size of the load
+/// command in bytes. It specifies the total size of the `SymtabCommand` structure and any additional
+/// data that follows it in the Mach-O file format.
+/// * `symoff`: The `symoff` property in the `SymtabCommand` struct represents the offset to the symbol
+/// table within a binary file. It indicates the location in the file where the symbol table data
+/// starts.
+/// * `nsyms`: The `nsyms` property in the `SymtabCommand` struct represents the number of symbols in
+/// the symbol table. It indicates the total count of symbols that are present in the symbol table
+/// referenced by this command.
+/// * `stroff`: The `stroff` property in the `SymtabCommand` struct represents the offset to the string
+/// table within the binary file. This offset indicates the location in the file where the string table
+/// data begins. The string table typically contains the names of symbols and other string data
+/// referenced by the symbol table or
+/// * `strsize`: The `strsize` property in the `SymtabCommand` struct represents the size of the string
+/// table in bytes. This value indicates the total size of the string table where the symbol names are
+/// stored.
 struct SymtabCommand {
     cmd: u32,
     cmdsize: u32,
@@ -47,6 +72,7 @@ struct SymtabCommand {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 // structure for one entry of the symtab
 struct Nlist64 {
     n_strx: u32,
@@ -130,6 +156,7 @@ pub fn parse_bin(pid: i32) {
                 // get the value corresponding to the index
                 let lc_symtab_offset = offset_map[6].1;
                 // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
+                // to read the lc_symtab command properties
                 let symtab_cmd: SymtabCommand = unsafe {
                     std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
                 };
