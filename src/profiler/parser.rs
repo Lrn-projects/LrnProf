@@ -6,6 +6,7 @@ use std::{
     fs::File,
     io::{BufReader, Read},
     path::Path,
+    ptr,
 };
 use symbolic_common::{Language, Name};
 use symbolic_demangle::{Demangle, DemangleOptions};
@@ -84,7 +85,7 @@ struct Nlist64 {
 
 use crate::{logs, utils};
 
-pub fn parse_bin_file(pid: i32, addr: Vec<u64>, base_addr: u64) {
+pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_base_addr: usize) {
     let output = utils::get_bin_path(pid);
     if !Path::new(&output).exists() {
         logs::error_log("Cannot find the binary of the process".to_string());
@@ -102,7 +103,9 @@ pub fn parse_bin_file(pid: i32, addr: Vec<u64>, base_addr: u64) {
     // fetch only the header from the whole binary
     let header_bytes = &bytes_vec[..header_size];
     // convert into the MachHeader64 struct
-    let header: MachHeader64 = unsafe { std::ptr::read(header_bytes.as_ptr() as *const _) };
+    let header: MachHeader64 = unsafe { std::ptr::read(readable_base_addr as *const MachHeader64) };
+
+    println!("{:?}", header);
 
     // init symtab command instance
     let mut symtab_cmd: SymtabCommand = SymtabCommand {
@@ -194,31 +197,48 @@ pub fn parse_bin_file(pid: i32, addr: Vec<u64>, base_addr: u64) {
     let string_table =
         &bytes_vec[symtab_cmd.stroff as usize..(symtab_cmd.stroff + symtab_cmd.strsize) as usize];
 
-    // create a vector containing all symbols name
-    let mut symbol_names: Vec<String> = Vec::new();
+    let mut filter_symtab: Vec<u64> = Vec::new();
     // loop over each symtab entries and resolve each symbols
     for each in &symtab_vec {
         let strx_offset = each.n_strx as usize;
-        let dyn_sym_off = base_addr + each.n_value;
-        let mut symbol_name = String::new();
-        let mut i = strx_offset;
+        let dyn_sym_off = if base_addr != 0 {
+            each.n_value
+        } else {
+            each.n_value
+        };
+        // println!(
+        //     "Base Addr: {:#x}, n_value: {:#x}, Calculated Addr: {:#x}",
+        //     base_addr, each.n_value, dyn_sym_off
+        // );
+        filter_symtab.push(dyn_sym_off);
+    }
 
-        while i < string_table.len() && string_table[i] != 0 {
-            symbol_name.push(string_table[i] as char);
-            i += 1;
-        }
-        if symbol_name != "" {
-            let symbol_name_demangle = Name::from(symbol_name);
-            if symbol_name_demangle.detect_language() != Language::Unknown {
-                symbol_names.push(
-                    symbol_name_demangle
-                        .try_demangle(DemangleOptions::name_only())
-                        .to_string(),
-                );
+    for addr in addresses {
+        for &sym_addr in &filter_symtab {
+            if addr == sym_addr {
+                // symbol name in string
+                let mut symbol_name = String::new();
+                let mut i = addr as usize;
+
+                while i < string_table.len() && string_table[i] != 0 {
+                    symbol_name.push(string_table[i] as char);
+                    i += 1;
+                }
+                if symbol_name != "" {
+                    let symbol_name_demangle = Name::from(symbol_name);
+                    if symbol_name_demangle.detect_language() != Language::Unknown {
+                        println!(
+                            "Symbol: {}, Address: {:#x}",
+                            symbol_name_demangle
+                                .try_demangle(DemangleOptions::name_only())
+                                .to_string(),
+                            addr
+                        );
+                    }
+                }
             }
         }
     }
-    // println!("{:?}", symbol_names);
 }
 
 // pub fn parse_bin_execution(pid: i32, addr: u64) {}

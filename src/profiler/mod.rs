@@ -5,6 +5,7 @@ use core::panic;
 
 use crate::logs;
 use libc::exit;
+use mach2::message::mach_msg_type_number_t;
 use mach2::traps::mach_task_self;
 use mach2::traps::task_for_pid;
 use read_process_memory::*;
@@ -151,9 +152,10 @@ pub fn run_profiler(pid: &i32) {
                 }
             }
         }
-
-        bin_loaded_addr = get_binary_based_addr(task);
-        parser::parse_bin_file(*pid, addresses, bin_loaded_addr);
+        #[allow(unused_assignments)]
+        let mut read_loaded_addr: usize = 0;
+        (bin_loaded_addr, read_loaded_addr) = get_binary_based_addr(task);
+        parser::parse_bin_file(*pid, addresses, bin_loaded_addr, read_loaded_addr);
     }
     //data output
     println!("binary loaded at: {:#x}", bin_loaded_addr);
@@ -220,7 +222,8 @@ fn read_process_address(
 ///
 /// The function `get_binary_based_addr` returns the memory address of the specified target task in
 /// binary format as a `u64` value.
-fn get_binary_based_addr(target_task: u32) -> u64 {
+fn get_binary_based_addr(target_task: u32) -> (u64, usize) {
+    // get base addr
     let mut address: mach2::vm_types::mach_vm_address_t = 0;
     let mut size: mach2::vm_types::mach_vm_size_t = 0;
     let flavor: i32 = 9;
@@ -228,6 +231,10 @@ fn get_binary_based_addr(target_task: u32) -> u64 {
     let mut infoCnt: mach2::message::mach_msg_type_number_t =
         std::mem::size_of::<mach2::vm_region::vm_region_basic_info_64>() as u32;
     let mut object_name: mach2::port::mach_port_t = 0;
+
+    // read base addr content
+    let mut data: usize = 0;
+    let mut dataCnt: mach2::message::mach_msg_type_number_t = 0;
 
     unsafe {
         let base_addr = mach2::vm::mach_vm_region(
@@ -240,6 +247,10 @@ fn get_binary_based_addr(target_task: u32) -> u64 {
             &mut object_name,
         );
     }
+    unsafe {
+        let read_addr =
+            mach2::vm::mach_vm_read(target_task, address, size, &mut data, &mut dataCnt);
+    }
 
-    address
+    return (address, data);
 }
