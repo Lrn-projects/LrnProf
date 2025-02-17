@@ -37,8 +37,10 @@ struct LoadCommand {
 struct SymtabCommand {
     cmd: u32,
     cmdsize: u32,
+    // symbol table offset
     symoff: u32,
     nsyms: u32,
+    // string table offset
     stroff: u32,
     strsize: u32,
 }
@@ -129,7 +131,13 @@ pub fn parse_bin(pid: i32) {
                 let symtab_cmd: SymtabCommand = unsafe {
                     std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
                 };
-                println!("offset: {:?}", symtab_cmd);
+                let symtab: Nlist64 = unsafe {
+                    std::ptr::read(bytes_vec[symtab_cmd.symoff as usize..].as_ptr() as *const _)
+                };
+                let mut symbol_resolve_map: Vec<(u32, usize)> = Vec::new();
+                // loop over the string table and resolve each symbols
+                // for
+                // println!("offset: {:?}", string_table);
                 break;
             }
         }
