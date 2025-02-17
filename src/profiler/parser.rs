@@ -192,13 +192,14 @@ pub fn parse_bin(pid: i32) {
     let string_table =
         &bytes_vec[symtab_cmd.stroff as usize..(symtab_cmd.stroff + symtab_cmd.strsize) as usize];
 
+    // create a vector containing all symbols name
     let mut symbol_names: Vec<String> = Vec::new();
     // loop over each symtab entries and resolve each symbols
     for each in &symtab_vec {
-        let strx = each.n_strx as usize;
+        let strx_offset = each.n_strx as usize;
 
         let mut symbol_name = String::new();
-        let mut i = strx;
+        let mut i = strx_offset;
 
         while i < string_table.len() && string_table[i] != 0 {
             symbol_name.push(string_table[i] as char);
