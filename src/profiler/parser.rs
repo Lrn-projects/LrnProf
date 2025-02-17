@@ -46,6 +46,7 @@ struct SymtabCommand {
 }
 
 #[derive(Debug)]
+// structure for one entry of the symtab
 struct Nlist64 {
     n_strx: u32,
     n_type: u8,
@@ -131,12 +132,26 @@ pub fn parse_bin(pid: i32) {
                 let symtab_cmd: SymtabCommand = unsafe {
                     std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
                 };
-                let symtab: Nlist64 = unsafe {
-                    std::ptr::read(bytes_vec[symtab_cmd.symoff as usize..].as_ptr() as *const _)
-                };
+                // loop over the all symtab to get all entries
+                for i in 0..symtab_cmd.nsyms {
+                    // offset of one symtab entry
+                    let symbol_offset =
+                        symtab_cmd.symoff + (i * std::mem::size_of::<Nlist64>() as u32);
+                    // one symtab entry
+                    let symtab: Nlist64 = unsafe {
+                        std::ptr::read(bytes_vec[symbol_offset as usize..].as_ptr() as *const _)
+                    };
+                    println!("{:?}", symtab);
+                }
                 let mut symbol_resolve_map: Vec<(u32, usize)> = Vec::new();
                 // loop over the string table and resolve each symbols
-                // for
+                for i in &bytes_vec
+                    [symtab_cmd.stroff as usize..(symtab_cmd.stroff + symtab_cmd.strsize) as usize]
+                {
+                    // let strx = symtab.n_strx as usize;
+                    // for i in
+                    // symbol_resolve_map.push(());
+                }
                 // println!("offset: {:?}", string_table);
                 break;
             }
