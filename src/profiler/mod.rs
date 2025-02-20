@@ -5,7 +5,6 @@ use core::panic;
 
 use crate::logs;
 use libc::exit;
-use mach2::message::mach_msg_type_number_t;
 use mach2::traps::mach_task_self;
 use mach2::traps::task_for_pid;
 use read_process_memory::*;
@@ -155,6 +154,10 @@ pub fn run_profiler(pid: &i32) {
         #[allow(unused_assignments)]
         let mut read_loaded_addr: usize = 0;
         (bin_loaded_addr, read_loaded_addr) = get_binary_based_addr(task);
+        println!(
+            "loaded addr {:#x} readable addr {:#x}",
+            bin_loaded_addr, read_loaded_addr
+        );
         parser::parse_bin_file(*pid, addresses, bin_loaded_addr, read_loaded_addr);
     }
     //data output

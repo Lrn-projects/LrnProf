@@ -6,7 +6,6 @@ use std::{
     fs::File,
     io::{BufReader, Read},
     path::Path,
-    ptr,
 };
 use symbolic_common::{Language, Name};
 use symbolic_demangle::{Demangle, DemangleOptions};
@@ -83,6 +82,23 @@ struct Nlist64 {
     n_value: u64,
 }
 
+#[derive(Debug)]
+#[allow(dead_code)]
+// LC_SEGMENT_64
+struct SegmentCommand64 {
+    cmd: u32,
+    cmdsize: u32,
+    segname: [u8; 16],
+    vmaddr: u64,
+    vmsize: u64,
+    fileoff: u64,
+    filesize: u64,
+    maxprot: u32,
+    initprot: u32,
+    nsects: u32,
+    flags: u32,
+}
+
 use crate::{logs, utils};
 
 pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_base_addr: usize) {
@@ -105,8 +121,6 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
     // convert into the MachHeader64 struct
     let header: MachHeader64 = unsafe { std::ptr::read(readable_base_addr as *const MachHeader64) };
 
-    println!("{:?}", header);
-
     // init symtab command instance
     let mut symtab_cmd: SymtabCommand = SymtabCommand {
         cmd: 0,
@@ -115,6 +129,21 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         nsyms: 0,
         stroff: 0,
         strsize: 0,
+    };
+
+    //init lc_segment_64 command instance
+    let mut lc_segment: SegmentCommand64 = SegmentCommand64 {
+        cmd: 0,
+        cmdsize: 0,
+        segname: [0; 16],
+        vmaddr: 0,
+        vmsize: 0,
+        fileoff: 0,
+        filesize: 0,
+        maxprot: 0,
+        initprot: 0,
+        nsects: 0,
+        flags: 0,
     };
 
     // create a vector containing all symtab entries
@@ -191,7 +220,25 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                 }
                 break;
             }
+            if i.cmd == 25 {
+                let lc_symtab_offset_index = offset_map.iter().position(|x| x.0 == 25);
+                // get the value corresponding to the index
+                let lc_symtab_offset = offset_map[1].1;
+                // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
+                // to read the lc_symtab command properties
+                lc_segment = unsafe {
+                    std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
+                };
+                let mut segment_name: String = String::new();
+                for each in lc_segment.segname.iter() {
+                    if *each != 0 {
+                        segment_name.push(*each as char);
+                    }
+                }
+                // println!("{}", segment_name)
+            }
         }
+        println!("{:?}", lc_segment);
     }
     // create a buffer containing all string table element
     let string_table =
