@@ -154,10 +154,6 @@ pub fn run_profiler(pid: &i32) {
         #[allow(unused_assignments)]
         let mut read_loaded_addr: usize = 0;
         (bin_loaded_addr, read_loaded_addr) = get_binary_based_addr(task);
-        println!(
-            "loaded addr {:#x} readable addr {:#x}",
-            bin_loaded_addr, read_loaded_addr
-        );
         parser::parse_bin_file(*pid, addresses, bin_loaded_addr, read_loaded_addr);
     }
     //data output

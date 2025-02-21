@@ -36,9 +36,6 @@ struct LoadCommand {
     cmdsize: u32,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
-
 /// The `SymtabCommand` struct represents a command in a Mach-O file format that contains information
 /// about symbol and string table offsets.
 ///
@@ -62,6 +59,8 @@ struct LoadCommand {
 /// * `strsize`: The `strsize` property in the `SymtabCommand` struct represents the size of the string
 /// table in bytes. This value indicates the total size of the string table where the symbol names are
 /// stored.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
 struct SymtabCommand {
     cmd: u32,
     cmdsize: u32,
@@ -131,21 +130,6 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         strsize: 0,
     };
 
-    //init lc_segment_64 command instance
-    let mut lc_segment: SegmentCommand64 = SegmentCommand64 {
-        cmd: 0,
-        cmdsize: 0,
-        segname: [0; 16],
-        vmaddr: 0,
-        vmsize: 0,
-        fileoff: 0,
-        filesize: 0,
-        maxprot: 0,
-        initprot: 0,
-        nsects: 0,
-        flags: 0,
-    };
-
     // create a vector containing all symtab entries
     let mut symtab_vec: Vec<Nlist64> = Vec::new();
 
@@ -195,7 +179,6 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         for i in s.loadCommand {
             // found the symbols table
             if i.cmd == 2 {
-                println!("Found load command with cmd value 2");
                 // get the offset_map index matching the symtab int
                 let lc_symtab_offset_index = offset_map.iter().position(|x| x.0 == 2);
                 // get the value corresponding to the index
@@ -226,7 +209,7 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                 let lc_symtab_offset = offset_map[1].1;
                 // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
                 // to read the lc_symtab command properties
-                lc_segment = unsafe {
+                let lc_segment: SegmentCommand64 = unsafe {
                     std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
                 };
                 let mut segment_name: String = String::new();
@@ -238,7 +221,6 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                 // println!("{}", segment_name)
             }
         }
-        println!("{:?}", lc_segment);
     }
     // create a buffer containing all string table element
     let string_table =
