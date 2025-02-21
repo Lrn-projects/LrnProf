@@ -115,11 +115,10 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
     }
     // read the header size and return the size in octets
     let header_size = std::mem::size_of::<MachHeader64>();
-    // fetch only the header from the whole binary
-    let header_bytes = &bytes_vec[..header_size];
     // convert into the MachHeader64 struct
     let header: MachHeader64 = unsafe { std::ptr::read(readable_base_addr as *const MachHeader64) };
 
+    println!("{:?}", header);
     // init symtab command instance
     let mut symtab_cmd: SymtabCommand = SymtabCommand {
         cmd: 0,
@@ -139,9 +138,6 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         logs::info_log("Binary magic is Mach-O".to_string());
         // get the total size of load command
         let load_commands_size = header.sizeofcmds as usize;
-        // extract bytes from load commands
-        // get only the load commands from the bytes
-        let load_commands_bytes = &bytes_vec[header_size..header_size + load_commands_size];
         // will contain all the load_commands
         let mut load_commands = Vec::new();
         // init the offset to iter over the load_commands
