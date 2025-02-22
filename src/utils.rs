@@ -5,12 +5,12 @@ pub fn command_usage(usage: &str) {
     exit(0);
 }
 
-pub fn rustprof_usage() {
+pub fn lrnprof_usage() {
     let usage = r"
-RustProf's cli.
+lrnprof's cli.
 
 
-Usage: RustProf command [options]
+Usage: lrnprof command [options]
 
 
 Commands:

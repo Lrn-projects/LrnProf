@@ -4,9 +4,9 @@ pub mod utils;
 
 use std::{env, process::exit};
 
-// Current version of RustProf
+// Current version of lrnprof
 // if modified and then running update command it will replace
-// your current RustProf installation with the newer version
+// your current lrnprof installation with the newer version
 const VERSION: &'static str = "0.1.0";
 
 #[derive(Debug, Clone)]
@@ -22,10 +22,10 @@ fn main() {
     if let Some(arg) = args.iter().last() {
         match arg.as_str().trim() {
             "-v" => {
-                utils::command_usage(&rustprof_version());
+                utils::command_usage(&lrnprof_version());
             }
             "--version" => {
-                utils::command_usage(&rustprof_version());
+                utils::command_usage(&lrnprof_version());
             }
             _ => {}
         }
@@ -51,8 +51,8 @@ fn main() {
 
     match command {
         Commands::Run { pid } => profiler::run_profiler(&pid),
-        Commands::Version => utils::command_usage(&rustprof_version()),
-        Commands::Help => utils::rustprof_usage(),
+        Commands::Version => utils::command_usage(&lrnprof_version()),
+        Commands::Help => utils::lrnprof_usage(),
     }
 }
 
@@ -61,12 +61,12 @@ fn usage_and_exit(msg: String) {
         eprintln!("{}", msg);
     }
 
-    utils::rustprof_usage();
+    utils::lrnprof_usage();
 
     exit(0);
 }
 
-pub fn rustprof_version() -> String {
-    let usage = format!("rustprof {VERSION}");
+pub fn lrnprof_version() -> String {
+    let usage = format!("lrnprof {VERSION}");
     usage
 }

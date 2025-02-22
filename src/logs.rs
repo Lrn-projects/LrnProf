@@ -16,6 +16,6 @@ pub fn error_log_with_code(msg: String, error: String) {
 }
 
 pub fn rp_log(msg: &str) {
-    let log = "[RustProf]".truecolor(255, 94, 0);
+    let log = "[lrnprof]".truecolor(255, 94, 0);
     println!("{} {}", log, msg);
 }
