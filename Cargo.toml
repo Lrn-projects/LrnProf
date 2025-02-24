@@ -12,3 +12,4 @@ backtrace = "0.3.60"
 read-process-memory = "0.1.6"
 symbolic-demangle = "12.13.4"
 symbolic-common = "12.13.4"
+lrncore = { git = "https://github.com/Lrn-projects/LrnCore.git", version = "0.1.0", branch="main" }

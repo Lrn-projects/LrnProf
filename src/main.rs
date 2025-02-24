@@ -22,10 +22,10 @@ fn main() {
     if let Some(arg) = args.iter().last() {
         match arg.as_str().trim() {
             "-v" => {
-                utils::command_usage(&lrnprof_version());
+                lrncore::usage_exit::command_usage(&lrnprof_version());
             }
             "--version" => {
-                utils::command_usage(&lrnprof_version());
+                lrncore::usage_exit::command_usage(&lrnprof_version());
             }
             _ => {}
         }
@@ -44,26 +44,16 @@ fn main() {
         Some("version") => Commands::Version,
         Some("help") => Commands::Help,
         _ => {
-            usage_and_exit("Invalid command".to_string());
+            lrncore::usage_exit::usage_and_exit("Invalid command", &utils::lrnprof_usage());
             return;
         }
     };
 
     match command {
         Commands::Run { pid } => profiler::run_profiler(&pid),
-        Commands::Version => utils::command_usage(&lrnprof_version()),
-        Commands::Help => utils::lrnprof_usage(),
+        Commands::Version => lrncore::usage_exit::command_usage(&lrnprof_version()),
+        Commands::Help => lrncore::usage_exit::command_usage(&utils::lrnprof_usage()),
     }
-}
-
-fn usage_and_exit(msg: String) {
-    if msg != "" {
-        eprintln!("{}", msg);
-    }
-
-    utils::lrnprof_usage();
-
-    exit(0);
 }
 
 pub fn lrnprof_version() -> String {

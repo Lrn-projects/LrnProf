@@ -1,11 +1,6 @@
-use std::process::{Command, exit};
+use std::process::Command;
 
-pub fn command_usage(usage: &str) {
-    println!("{}", usage);
-    exit(0);
-}
-
-pub fn lrnprof_usage() {
+pub fn lrnprof_usage() -> &'static str {
     let usage = r"
 lrnprof's cli.
 
@@ -23,7 +18,7 @@ Options:
     -v, --version   Show the current version of RustySpider
 ";
 
-    println!("{}", usage);
+    return usage;
 }
 
 pub fn get_bin_path(pid: i32) -> String {
