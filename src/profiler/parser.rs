@@ -138,30 +138,30 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         let mut offset_map = Vec::new();
         // loop to read all the load_commands
         for _ in 0..header.ncmds {
-            while offset < load_commands_size as u64 {
-                // Unsafe operation: Direct memory reading without validity checks.
-                //
-                // We get a pointer to the bytes starting at `offset` within `load_commands_bytes`.
-                // `as_ptr()` gives a `*const u8`, which we cast to `*const LoadCommand`
-                // to tell the compiler: "These bytes represent a LoadCommand structure."
-                //
-                // Then, `std::ptr::read(...)` reads these bytes and interprets them as a `LoadCommand`.
-                // If the bytes do not exactly match a `LoadCommand` structure, this leads to **Undefined Behavior**.
-                //
-                // Safer alternative: Check that `offset + size_of::<LoadCommand>() <= load_commands_bytes.len()`
-                // before performing this conversion.
-
-                let cmd = unsafe { std::ptr::read(offset as *const LoadCommand) };
-                println!("{:?}", cmd);
-                // get the size of the current load_command
-                let cmdsize = cmd.cmdsize;
-                // add the current load_command to the vector
-                load_commands.push(cmd);
-                // push the current offset to the map
-                offset_map.push((cmd.cmd, offset));
-                // move the offset forward to get the next load_command
-                offset += cmdsize as u64;
+            if offset >= base_addr + header.sizeofcmds as u64 {
+                break;
             }
+            // Unsafe operation: Direct memory reading without validity checks.
+            //
+            // We get a pointer to the bytes starting at `offset` within `load_commands_bytes`.
+            // `as_ptr()` gives a `*const u8`, which we cast to `*const LoadCommand`
+            // to tell the compiler: "These bytes represent a LoadCommand structure."
+            //
+            // Then, `std::ptr::read(...)` reads these bytes and interprets them as a `LoadCommand`.
+            // If the bytes do not exactly match a `LoadCommand` structure, this leads to **Undefined Behavior**.
+            //
+            // Safer alternative: Check that `offset + size_of::<LoadCommand>() <= load_commands_bytes.len()`
+            // before performing this conversion.
+            let cmd = unsafe { std::ptr::read(offset as *const LoadCommand) };
+            println!("{:?}", cmd);
+            // get the size of the current load_command
+            let cmdsize = cmd.cmdsize;
+            // add the current load_command to the vector
+            load_commands.push(cmd);
+            // push the current offset to the map
+            offset_map.push((cmd.cmd, offset));
+            // move the offset forward to get the next load_command
+            offset += cmdsize as u64;
         }
         let s = MachOBinary {
             loadCommand: load_commands,
