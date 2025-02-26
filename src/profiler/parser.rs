@@ -2,14 +2,12 @@
 // iterate over the binary straightforward to find the intended data
 // https://github.com/aidansteele/osx-abi-macho-file-format-reference
 
+use std::process::exit;
+
 use lrncore::logs;
-use std::{
-    fs::File,
-    io::{BufReader, Read},
-    path::Path,
-};
-use symbolic_common::{Language, Name};
-use symbolic_demangle::{Demangle, DemangleOptions};
+
+// use symbolic_common::{Language, Name};
+// use symbolic_demangle::{Demangle, DemangleOptions};
 
 use crate::profiler::utils;
 
@@ -165,6 +163,7 @@ pub fn parse_bin_file(
             let cmd = unsafe { std::ptr::read(readable_offset.as_ptr() as *const LoadCommand) };
             // get the size of the current load_command
             let cmdsize = cmd.cmdsize;
+            println!("{:?}", cmd);
             // add the current load_command to the vector
             load_commands.push(cmd);
             // push the current offset to the map
@@ -174,6 +173,7 @@ pub fn parse_bin_file(
                 offset += cmdsize as usize;
             } else if offset + cmdsize as usize % 8 != 0 {
                 logs::error_log("Error from the offset, misalignment");
+                exit(1);
             } else {
                 break;
             }

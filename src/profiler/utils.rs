@@ -1,5 +1,3 @@
-use std::result;
-
 /// The function `debug_binary_format` in Rust prints the hexadecimal representation of the first 4
 /// bytes of a given vector as a u64 integer.
 ///
@@ -35,5 +33,5 @@ pub fn read_addr(task: u32, offset: u64, sizecmds: u32) -> Vec<u8> {
             eprintln!("Error reading memory: {}", result);
         }
     }
-    return data.to_vec();
+    data
 }
