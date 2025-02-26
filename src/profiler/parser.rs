@@ -140,6 +140,8 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         let load_commands_size = header.sizeofcmds as usize;
         // will contain all the load_commands
         let mut load_commands = Vec::new();
+        // create a slice of the load commands bytes
+        let load_commands_bytes = &bytes_vec[header_size..header_size + load_commands_size];
         // init the offset to iter over the load_commands
         let mut offset = 0;
         // store all the offset of the binary when iter over the load_commands_size
