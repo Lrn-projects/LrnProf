@@ -9,6 +9,7 @@ use mach2::traps::task_for_pid;
 use read_process_memory::*;
 embed_plist::embed_info_plist!("../../Info.plist");
 mod parser;
+mod utils;
 
 pub fn run_profiler(pid: &i32) {
     lrncore::logs::lrn_log("LrnProf", "Start running the profiler...");
@@ -153,7 +154,7 @@ pub fn run_profiler(pid: &i32) {
         #[allow(unused_assignments)]
         let mut read_loaded_addr: usize = 0;
         (bin_loaded_addr, read_loaded_addr) = get_binary_based_addr(task);
-        parser::parse_bin_file(*pid, addresses, bin_loaded_addr, read_loaded_addr);
+        parser::parse_bin_file(*pid, addresses, bin_loaded_addr, read_loaded_addr, task);
     }
     //data output
     println!("binary loaded at: {:#x}", bin_loaded_addr);

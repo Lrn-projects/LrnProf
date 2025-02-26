@@ -2,6 +2,7 @@
 // iterate over the binary straightforward to find the intended data
 // https://github.com/aidansteele/osx-abi-macho-file-format-reference
 
+use lrncore::logs;
 use std::{
     fs::File,
     io::{BufReader, Read},
@@ -9,6 +10,8 @@ use std::{
 };
 use symbolic_common::{Language, Name};
 use symbolic_demangle::{Demangle, DemangleOptions};
+
+use crate::profiler::utils;
 
 #[derive(Debug)]
 struct MachOBinary {
@@ -98,7 +101,13 @@ struct SegmentCommand64 {
     flags: u32,
 }
 
-pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_base_addr: usize) {
+pub fn parse_bin_file(
+    pid: i32,
+    addresses: Vec<u64>,
+    base_addr: u64,
+    readable_base_addr: usize,
+    task: u32,
+) {
     // read the header size and return the size in octets
     let header_size = std::mem::size_of::<MachHeader64>();
     // convert into the MachHeader64 struct
@@ -120,7 +129,7 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
 
     //TODO
     //remove
-    let mut bytes_vec = Vec::new();
+    let bytes_vec = Vec::new();
 
     // read the magic number of the binary to find the magic
     // match the binary magic in little endian
@@ -130,15 +139,14 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         let load_commands_size = header.sizeofcmds as usize;
         // will contain all the load_commands
         let mut load_commands = Vec::new();
-        // load commands addr
-        let load_commands_addr = base_addr + size_of::<MachHeader64>() as u64;
         // init the offset to iter over the load_commands
-        let mut offset = load_commands_addr;
+        let load_commands_base_addr = readable_base_addr + std::mem::size_of::<MachHeader64>();
+        let mut offset = readable_base_addr + std::mem::size_of::<MachHeader64>();
         // store all the offset of the binary when iter over the load_commands_size
         let mut offset_map = Vec::new();
         // loop to read all the load_commands
         for _ in 0..header.ncmds {
-            if offset >= base_addr + header.sizeofcmds as u64 {
+            if offset >= readable_base_addr + header.sizeofcmds as usize {
                 break;
             }
             // Unsafe operation: Direct memory reading without validity checks.
@@ -152,8 +160,9 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
             //
             // Safer alternative: Check that `offset + size_of::<LoadCommand>() <= load_commands_bytes.len()`
             // before performing this conversion.
-            let cmd = unsafe { std::ptr::read(offset as *const LoadCommand) };
-            println!("{:?}", cmd);
+            let readable_offset =
+                utils::read_addr(task, offset.try_into().unwrap(), header.sizeofcmds);
+            let cmd = unsafe { std::ptr::read(readable_offset.as_ptr() as *const LoadCommand) };
             // get the size of the current load_command
             let cmdsize = cmd.cmdsize;
             // add the current load_command to the vector
@@ -161,7 +170,13 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
             // push the current offset to the map
             offset_map.push((cmd.cmd, offset));
             // move the offset forward to get the next load_command
-            offset += cmdsize as u64;
+            if offset + cmdsize as usize <= load_commands_base_addr + header.sizeofcmds as usize {
+                offset += cmdsize as usize;
+            } else if offset + cmdsize as usize % 8 != 0 {
+                logs::error_log("Error from the offset, misalignment");
+            } else {
+                break;
+            }
         }
         let s = MachOBinary {
             loadCommand: load_commands,
@@ -190,7 +205,7 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                         symtab_vec.push(symtab);
                     }
                 }
-                break;
+                println!("{:?}", symtab_cmd);
             }
             if i.cmd == 25 {
                 let lc_symtab_offset_index = offset_map.iter().position(|x| x.0 == 25);
