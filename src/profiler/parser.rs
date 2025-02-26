@@ -98,21 +98,7 @@ struct SegmentCommand64 {
     flags: u32,
 }
 
-use crate::utils;
-
 pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_base_addr: usize) {
-    let output = utils::get_bin_path(pid);
-    if !Path::new(&output).exists() {
-        lrncore::logs::error_log("Cannot find the binary of the process");
-    }
-    lrncore::logs::info_log("Binary found");
-    let my_buf = BufReader::new(File::open(output).unwrap());
-    // vector containing the whole binary
-    let mut bytes_vec: Vec<u8> = Vec::new();
-    for byte_or_error in my_buf.bytes() {
-        let byte = byte_or_error.unwrap();
-        bytes_vec.push(byte);
-    }
     // read the header size and return the size in octets
     let header_size = std::mem::size_of::<MachHeader64>();
     // convert into the MachHeader64 struct
@@ -132,6 +118,10 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
     // create a vector containing all symtab entries
     let mut symtab_vec: Vec<Nlist64> = Vec::new();
 
+    //TODO
+    //remove
+    let mut bytes_vec = Vec::new();
+
     // read the magic number of the binary to find the magic
     // match the binary magic in little endian
     if header.magic == 0xfeedfacf || header.magic == 0xfeedface {
@@ -140,35 +130,38 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         let load_commands_size = header.sizeofcmds as usize;
         // will contain all the load_commands
         let mut load_commands = Vec::new();
-        // create a slice of the load commands bytes
-        let load_commands_bytes = &bytes_vec[header_size..header_size + load_commands_size];
+        // load commands addr
+        let load_commands_addr = base_addr + size_of::<MachHeader64>() as u64;
         // init the offset to iter over the load_commands
-        let mut offset = 0;
+        let mut offset = load_commands_addr;
         // store all the offset of the binary when iter over the load_commands_size
         let mut offset_map = Vec::new();
         // loop to read all the load_commands
-        while offset < load_commands_size {
-            // Unsafe operation: Direct memory reading without validity checks.
-            //
-            // We get a pointer to the bytes starting at `offset` within `load_commands_bytes`.
-            // `as_ptr()` gives a `*const u8`, which we cast to `*const LoadCommand`
-            // to tell the compiler: "These bytes represent a LoadCommand structure."
-            //
-            // Then, `std::ptr::read(...)` reads these bytes and interprets them as a `LoadCommand`.
-            // If the bytes do not exactly match a `LoadCommand` structure, this leads to **Undefined Behavior**.
-            //
-            // Safer alternative: Check that `offset + size_of::<LoadCommand>() <= load_commands_bytes.len()`
-            // before performing this conversion.
-            let cmd: LoadCommand =
-                unsafe { std::ptr::read(load_commands_bytes[offset..].as_ptr() as *const _) };
-            // get the size of the current load_command
-            let cmdsize = cmd.cmdsize;
-            // add the current load_command to the vector
-            load_commands.push(cmd);
-            // push the current offset to the map
-            offset_map.push((cmd.cmd, offset));
-            // move the offset forward to get the next load_command
-            offset += cmdsize as usize;
+        for _ in 0..header.ncmds {
+            while offset < load_commands_size as u64 {
+                // Unsafe operation: Direct memory reading without validity checks.
+                //
+                // We get a pointer to the bytes starting at `offset` within `load_commands_bytes`.
+                // `as_ptr()` gives a `*const u8`, which we cast to `*const LoadCommand`
+                // to tell the compiler: "These bytes represent a LoadCommand structure."
+                //
+                // Then, `std::ptr::read(...)` reads these bytes and interprets them as a `LoadCommand`.
+                // If the bytes do not exactly match a `LoadCommand` structure, this leads to **Undefined Behavior**.
+                //
+                // Safer alternative: Check that `offset + size_of::<LoadCommand>() <= load_commands_bytes.len()`
+                // before performing this conversion.
+
+                let cmd = unsafe { std::ptr::read(offset as *const LoadCommand) };
+                println!("{:?}", cmd);
+                // get the size of the current load_command
+                let cmdsize = cmd.cmdsize;
+                // add the current load_command to the vector
+                load_commands.push(cmd);
+                // push the current offset to the map
+                offset_map.push((cmd.cmd, offset));
+                // move the offset forward to get the next load_command
+                offset += cmdsize as u64;
+            }
         }
         let s = MachOBinary {
             loadCommand: load_commands,
@@ -183,9 +176,7 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                 let lc_symtab_offset = offset_map[6].1;
                 // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
                 // to read the lc_symtab command properties
-                symtab_cmd = unsafe {
-                    std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
-                };
+                symtab_cmd = unsafe { std::ptr::read(lc_symtab_offset as *const _) };
                 // loop over the all symtab to get all entries
                 for i in 0..symtab_cmd.nsyms {
                     // offset of one symtab entry
@@ -207,16 +198,15 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                 let lc_symtab_offset = offset_map[1].1;
                 // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
                 // to read the lc_symtab command properties
-                let lc_segment: SegmentCommand64 = unsafe {
-                    std::ptr::read(load_commands_bytes[lc_symtab_offset..].as_ptr() as *const _)
-                };
+                let lc_segment: SegmentCommand64 =
+                    unsafe { std::ptr::read(lc_symtab_offset as *const _) };
                 let mut segment_name: String = String::new();
                 for each in lc_segment.segname.iter() {
                     if *each != 0 {
                         segment_name.push(*each as char);
                     }
                 }
-                // println!("{}", segment_name)
+                println!("{:?}", lc_segment)
             }
         }
     }
@@ -240,32 +230,32 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         filter_symtab.push(dyn_sym_off);
     }
 
-    for addr in addresses {
-        for &sym_addr in &filter_symtab {
-            if addr == sym_addr {
-                // symbol name in string
-                let mut symbol_name = String::new();
-                let mut i = addr as usize;
+    // for addr in addresses {
+    //     for &sym_addr in &filter_symtab {
+    //         if addr == sym_addr {
+    //             // symbol name in string
+    //             let mut symbol_name = String::new();
+    //             let mut i = addr as usize;
 
-                while i < string_table.len() && string_table[i] != 0 {
-                    symbol_name.push(string_table[i] as char);
-                    i += 1;
-                }
-                if symbol_name != "" {
-                    let symbol_name_demangle = Name::from(symbol_name);
-                    if symbol_name_demangle.detect_language() != Language::Unknown {
-                        println!(
-                            "Symbol: {}, Address: {:#x}",
-                            symbol_name_demangle
-                                .try_demangle(DemangleOptions::name_only())
-                                .to_string(),
-                            addr
-                        );
-                    }
-                }
-            }
-        }
-    }
+    //             while i < string_table.len() && string_table[i] != 0 {
+    //                 symbol_name.push(string_table[i] as char);
+    //                 i += 1;
+    //             }
+    //             if symbol_name != "" {
+    //                 let symbol_name_demangle = Name::from(symbol_name);
+    //                 if symbol_name_demangle.detect_language() != Language::Unknown {
+    //                     println!(
+    //                         "Symbol: {}, Address: {:#x}",
+    //                         symbol_name_demangle
+    //                             .try_demangle(DemangleOptions::name_only())
+    //                             .to_string(),
+    //                         addr
+    //                     );
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 // pub fn parse_bin_execution(pid: i32, addr: u64) {}
