@@ -3,7 +3,6 @@
 
 use core::panic;
 
-use crate::logs;
 use libc::exit;
 use mach2::traps::mach_task_self;
 use mach2::traps::task_for_pid;
@@ -12,7 +11,7 @@ embed_plist::embed_info_plist!("../../Info.plist");
 mod parser;
 
 pub fn run_profiler(pid: &i32) {
-    logs::rp_log("Start running the profiler...");
+    lrncore::logs::lrn_log("LrnProf", "Start running the profiler...");
     let mut task: u32 = 0;
 
     // kernel error code
@@ -68,9 +67,9 @@ pub fn run_profiler(pid: &i32) {
         let task_pid = task_for_pid(mach_task_self(), *pid, &mut task);
 
         if task_pid != kernel_success {
-            logs::error_log_with_code(
-                "Error attaching the process to task_for_pid. Code:".to_string(),
-                task_pid.to_string(),
+            lrncore::logs::error_log_with_code(
+                "Error attaching the process to task_for_pid. Code:",
+                task_pid.to_string().as_str(),
             );
             exit(1);
         }
@@ -78,9 +77,9 @@ pub fn run_profiler(pid: &i32) {
         let task_thread = libc::task_threads(task, &mut thread_list, &mut thread_count);
 
         if task_thread != kernel_success {
-            logs::error_log_with_code(
-                "Error getting the thread for the given pid. Code:".to_string(),
-                task_pid.to_string(),
+            lrncore::logs::error_log_with_code(
+                "Error getting the thread for the given pid. Code:",
+                task_pid.to_string().as_str(),
             );
             exit(1);
         }
@@ -93,9 +92,9 @@ pub fn run_profiler(pid: &i32) {
         );
 
         if thread_info != kernel_success {
-            logs::error_log_with_code(
-                "Error getting info from mach for the given thread. Code:".to_string(),
-                task_pid.to_string(),
+            lrncore::logs::error_log_with_code(
+                "Error getting info from mach for the given thread. Code:",
+                task_pid.to_string().as_str(),
             );
             exit(1);
         }

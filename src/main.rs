@@ -1,4 +1,3 @@
-pub mod logs;
 mod profiler;
 pub mod utils;
 

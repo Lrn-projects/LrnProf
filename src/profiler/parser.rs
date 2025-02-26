@@ -98,14 +98,14 @@ struct SegmentCommand64 {
     flags: u32,
 }
 
-use crate::{logs, utils};
+use crate::utils;
 
 pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_base_addr: usize) {
     let output = utils::get_bin_path(pid);
     if !Path::new(&output).exists() {
-        logs::error_log("Cannot find the binary of the process".to_string());
+        lrncore::logs::error_log("Cannot find the binary of the process");
     }
-    logs::info_log("Binary found".to_string());
+    lrncore::logs::info_log("Binary found");
     let my_buf = BufReader::new(File::open(output).unwrap());
     // vector containing the whole binary
     let mut bytes_vec: Vec<u8> = Vec::new();
@@ -135,7 +135,7 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
     // read the magic number of the binary to find the magic
     // match the binary magic in little endian
     if header.magic == 0xfeedfacf || header.magic == 0xfeedface {
-        logs::info_log("Binary magic is Mach-O".to_string());
+        lrncore::logs::info_log("Binary magic is Mach-O");
         // get the total size of load command
         let load_commands_size = header.sizeofcmds as usize;
         // will contain all the load_commands
