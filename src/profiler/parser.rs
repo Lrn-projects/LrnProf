@@ -140,15 +140,15 @@ pub fn parse_bin_file(
         // init the offset to iter over the load_commands
         let load_commands_base_addr = base_addr as usize + std::mem::size_of::<MachHeader64>();
         let mut offset = base_addr as usize + std::mem::size_of::<MachHeader64>();
-        let read_offset = utils::read_addr(task, offset as u64, header.sizeofcmds);
         // store all the offset of the binary when iter over the load_commands_size
         let mut offset_map = Vec::new();
         // loop to read all the load_commands
 
         for _ in 0..header.ncmds {
-            if offset >= base_addr_buffer + header.sizeofcmds as usize {
+            if offset >= base_addr as usize + header.sizeofcmds as usize {
                 break;
             }
+            let read_offset = utils::read_addr(task, offset as u64, header.sizeofcmds);
             // Unsafe operation: Direct memory reading without validity checks.
             //
             // We get a pointer to the bytes starting at `offset` within `load_commands_bytes`.
