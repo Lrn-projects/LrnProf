@@ -103,13 +103,13 @@ pub fn parse_bin_file(
     pid: i32,
     addresses: Vec<u64>,
     base_addr: u64,
-    readable_base_addr: usize,
+    base_addr_buffer: usize,
     task: u32,
 ) {
     // read the header size and return the size in octets
     let header_size = std::mem::size_of::<MachHeader64>();
     // convert into the MachHeader64 struct
-    let header: MachHeader64 = unsafe { std::ptr::read(readable_base_addr as *const MachHeader64) };
+    let header: MachHeader64 = unsafe { std::ptr::read(base_addr_buffer as *const MachHeader64) };
 
     println!("{:?}", header);
     // init symtab command instance
@@ -138,13 +138,15 @@ pub fn parse_bin_file(
         // will contain all the load_commands
         let mut load_commands = Vec::new();
         // init the offset to iter over the load_commands
-        let load_commands_base_addr = readable_base_addr + std::mem::size_of::<MachHeader64>();
-        let mut offset = readable_base_addr + std::mem::size_of::<MachHeader64>();
+        let load_commands_base_addr = base_addr as usize + std::mem::size_of::<MachHeader64>();
+        let mut offset = base_addr as usize + std::mem::size_of::<MachHeader64>();
+        let read_offset = utils::read_addr(task, offset as u64, header.sizeofcmds);
         // store all the offset of the binary when iter over the load_commands_size
         let mut offset_map = Vec::new();
         // loop to read all the load_commands
+
         for _ in 0..header.ncmds {
-            if offset >= readable_base_addr + header.sizeofcmds as usize {
+            if offset >= base_addr_buffer + header.sizeofcmds as usize {
                 break;
             }
             // Unsafe operation: Direct memory reading without validity checks.
@@ -158,9 +160,7 @@ pub fn parse_bin_file(
             //
             // Safer alternative: Check that `offset + size_of::<LoadCommand>() <= load_commands_bytes.len()`
             // before performing this conversion.
-            let readable_offset =
-                utils::read_addr(task, offset.try_into().unwrap(), header.sizeofcmds);
-            let cmd = unsafe { std::ptr::read(readable_offset.as_ptr() as *const LoadCommand) };
+            let cmd = unsafe { std::ptr::read(read_offset as *const LoadCommand) };
             // get the size of the current load_command
             let cmdsize = cmd.cmdsize;
             println!("{:?}", cmd);
@@ -233,7 +233,7 @@ pub fn parse_bin_file(
     // loop over each symtab entries and resolve each symbols
     for each in &symtab_vec {
         let strx_offset = each.n_strx as usize;
-        let dyn_sym_off = if base_addr != 0 {
+        let dyn_sym_off = if base_addr_buffer != 0 {
             each.n_value
         } else {
             each.n_value

@@ -16,19 +16,13 @@ pub fn debug_binary_format(vec: Vec<u8>) {
     println!("[DEBUG] {:#x}", u64::from_le_bytes(array));
 }
 
-pub fn read_addr(task: u32, offset: u64, sizecmds: u32) -> Vec<u8> {
+pub fn read_addr(task: u32, offset: u64, sizecmds: u32) -> usize {
     let size: mach2::vm_types::mach_vm_size_t = sizecmds as mach2::vm_types::mach_vm_size_t;
     // read base addr content
-    let mut data = vec![0u8; size as usize]; // allocate buffer
+    let mut data: usize = 0; // allocate buffer
     let mut dataCnt: mach2::message::mach_msg_type_number_t = 0;
     unsafe {
-        let result = mach2::vm::mach_vm_read(
-            task,
-            offset,
-            size,
-            data.as_mut_ptr() as *mut _,
-            &mut dataCnt,
-        );
+        let result = mach2::vm::mach_vm_read(task, offset, size, &mut data, &mut dataCnt);
         if result != mach2::kern_return::KERN_SUCCESS {
             eprintln!("Error reading memory: {}", result);
         }
