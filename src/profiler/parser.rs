@@ -144,39 +144,56 @@ pub fn parse_bin_file(
         let mut offset_map = Vec::new();
         // loop to read all the load_commands
 
+        //TODO
+        //fix the segfault
+
         for _ in 0..header.ncmds {
-            if offset >= base_addr as usize + header.sizeofcmds as usize {
+            if offset >= load_commands_base_addr + header.sizeofcmds as usize {
                 break;
             }
+            if offset % 8 != 0 {
+                logs::error_log(&format!("Offset misaligned: 0x{:x}", offset));
+                exit(1);
+            }
             let read_offset = utils::read_addr(task, offset as u64, header.sizeofcmds);
-            // Unsafe operation: Direct memory reading without validity checks.
-            //
-            // We get a pointer to the bytes starting at `offset` within `load_commands_bytes`.
-            // `as_ptr()` gives a `*const u8`, which we cast to `*const LoadCommand`
-            // to tell the compiler: "These bytes represent a LoadCommand structure."
-            //
-            // Then, `std::ptr::read(...)` reads these bytes and interprets them as a `LoadCommand`.
-            // If the bytes do not exactly match a `LoadCommand` structure, this leads to **Undefined Behavior**.
-            //
-            // Safer alternative: Check that `offset + size_of::<LoadCommand>() <= load_commands_bytes.len()`
-            // before performing this conversion.
+            // unsafe operation
             let cmd = unsafe { std::ptr::read(read_offset as *const LoadCommand) };
             // get the size of the current load_command
             let cmdsize = cmd.cmdsize;
-            println!("{:?}", cmd);
+            if cmdsize < 8 || cmdsize % 8 != 0 || cmdsize > 0x1000 {
+                logs::error_log(&format!("Load command size {} is too small", cmdsize));
+                exit(1);
+            }
+
+            let base_cmd = cmd.cmd & 0x7FFFFFFF;
+
+            if base_cmd > 50 {
+                logs::error_log(&format!("Cmd not valid: {}", cmd.cmd));
+                exit(1);
+            }
             // add the current load_command to the vector
             load_commands.push(cmd);
             // push the current offset to the map
             offset_map.push((cmd.cmd, offset));
             // move the offset forward to get the next load_command
+            if (offset + cmdsize as usize) > (base_addr as usize + header.sizeofcmds as usize) {
+                break;
+            }
             if offset + cmdsize as usize <= load_commands_base_addr + header.sizeofcmds as usize {
                 offset += cmdsize as usize;
-            } else if offset + cmdsize as usize % 8 != 0 {
+            } else if (offset + cmdsize as usize) % 8 != 0 {
                 logs::error_log("Error from the offset, misalignment");
                 exit(1);
             } else {
                 break;
             }
+        }
+        if header.ncmds as usize != load_commands.len() {
+            println!(
+                "[WARNING] difference between total of load commands and total of load commands saved: ncmds {}, total load commands saved: {}",
+                header.ncmds,
+                load_commands.len()
+            );
         }
         let s = MachOBinary {
             loadCommand: load_commands,
