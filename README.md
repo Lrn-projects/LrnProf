@@ -46,3 +46,4 @@ let thread_info = libc::thread_info(
 ```
 
 `thread_list` variable is just a pointer, the flavor a u32 and the rest is buffer. But if you pass a different flavor you get new information like totally different. Or almost, like it's used like a "filter ?" What do you want to retrieve from this function you pass the correct flavor and use the buffer or the pointer. And that's so cool. No use of return value from the function. Directly write to a pointer or mutable buffer and you can use them. But once more it's not useful to make a profiler work.
+
