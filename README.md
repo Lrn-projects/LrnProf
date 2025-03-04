@@ -47,3 +47,64 @@ let thread_info = libc::thread_info(
 
 `thread_list` variable is just a pointer, the flavor a u32 and the rest is buffer. But if you pass a different flavor you get new information like totally different. Or almost, like it's used like a "filter ?" What do you want to retrieve from this function you pass the correct flavor and use the buffer or the pointer. And that's so cool. No use of return value from the function. Directly write to a pointer or mutable buffer and you can use them. But once more it's not useful to make a profiler work.
 
+Next I use the `thread_get_state` function, it is used to get the state of all given thread, this function is used to get things like CPU registry, thread state(if is paused, locked, pending...). `thread_get_state` can be used to retrieve where each thread execute there code. You use it like `thread_info`, you passe the thread you want to analyze, a flavor, a mutable buffer and the buffer size. Then you use the data store in the buffer.
+
+The next thing I do is to retrace the call stack of the main thread. I didn't have any use of it for know so I'll explain it anyway. When using the buffer fill from `thread_get_state`, we can retrace the call stack. We can retrace the call stack by following the pointers of the stack frame. The stack frame is how certain arch store data from the call stack. There:
+
+- `FP`: `Frame Pointer` It point to the beginning of the next stack frame.
+- `LR`: `Link Register` contain the return address, corresponding to the calling function
+- `SP`: `Stack Pointer` point to the top of the stack
+- `PC`: `Program counter` address of the current execute function
+
+To retrace the call stack we need to follow the FP of each stack frame to retrieve previous FP.
+
+We read FP to get:
+
+- the `Next FP`
+- the `Next LR`
+
+We store `Next LR` and we repeat over until `Next FP == 0`. So we will be at the top of the stack.
+
+```rust
+let mut FP = new_state[29];
+// link register (return addr)
+let LR = new_state[30];
+// stack pointer
+let SP = new_state[31];
+// program pointer
+let PC = new_state[32];
+
+if FP == 0 {
+    panic!("FP is 0 cannot unreferenced");
+}
+
+let fp_ptr = FP as *const u64;
+
+let pid_i32 = *pid as i32;
+if !fp_ptr.is_null() {
+    loop {
+        let read_process_address = read_process_address(
+            pid_i32,
+            FP as usize,
+            size,
+            &mut process_address_bytes_buffer,
+        )
+        .unwrap();
+
+        // load the specific chunk of the buffer into vector
+        // used to get the next_fp and next_lr addresses
+        next_fp_bytes_vec.copy_from_slice(&process_address_bytes_buffer[..8]);
+        next_lr_bytes_vec.copy_from_slice(&process_address_bytes_buffer[8..16]);
+        let next_fp = u64::from_le_bytes(next_fp_bytes_vec);
+        let next_lr = u64::from_le_bytes(next_lr_bytes_vec);
+        addresses.push(next_lr);
+        let current_fp = FP;
+        FP = next_fp;
+        // println!("Next FP: {:#x}, Next LR: {:#x}", current_fp, next_lr);
+        if next_fp == 0 {
+            break;
+        }
+    }
+}
+```
+
