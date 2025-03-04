@@ -193,8 +193,29 @@ pub fn parse_bin_file(
         let s = MachOBinary {
             loadCommand: load_commands,
         };
+        // store all lc_segment command
+        let mut lc_symtab_vec = Vec::new();
         // iterate over the struct load_command
         for i in s.loadCommand {
+            if i.cmd == 25 {
+                for each in 0..5 {
+                    // get the value corresponding to the index
+                    let lc_symtab_offset = offset_map[each].1;
+                    // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
+                    // to read the lc_symtab command properties
+                    let read_lc_symtab_offset =
+                        utils::read_addr(task, lc_symtab_offset as u64, i.cmdsize);
+                    let lc_segment: SegmentCommand64 =
+                        unsafe { std::ptr::read(read_lc_symtab_offset as *const SegmentCommand64) };
+                    let mut segment_name: String = String::new();
+                    for each in lc_segment.segname.iter() {
+                        if *each != 0 {
+                            segment_name.push(*each as char);
+                        }
+                    }
+                    lc_symtab_vec.push((segment_name, lc_segment));
+                }
+            }
             // found the symbols table
             if i.cmd == 2 {
                 // get the offset_map index matching the symtab int
@@ -207,22 +228,28 @@ pub fn parse_bin_file(
                     utils::read_addr(task, lc_symtab_offset as u64, i.cmdsize);
                 symtab_cmd =
                     unsafe { std::ptr::read(read_lc_symtab_offset as *const SymtabCommand) };
+                println!("{:?}", symtab_cmd);
                 // loop over the all symtab to get all entries
                 for each in 0..symtab_cmd.nsyms {
                     // offset of one symtab entry
-                    let symbol_offset: u32;
-                    if symtab_cmd.symoff + (each * std::mem::size_of::<Nlist64>() as u32)
-                        < symtab_cmd.stroff + symtab_cmd.strsize
-                    {
-                        symbol_offset =
-                            symtab_cmd.symoff + (each * std::mem::size_of::<Nlist64>() as u32);
-                    } else {
-                        logs::error_log("Symbol offset out of bounds");
-                        continue;
+                    let vmaddr = lc_symtab_vec[4].1.vmaddr;
+                    let fileoff = lc_symtab_vec[4].1.fileoff;
+                    if fileoff > vmaddr {
+                        panic!("fileoff ({}) is larger than vmaddr ({})", fileoff, vmaddr);
                     }
+                    let symbol_offset = (vmaddr - fileoff) + symtab_cmd.symoff as u64;
+                    // if symtab_cmd.symoff + (each * std::mem::size_of::<Nlist64>() as u32)
+                    //     < symtab_cmd.stroff + symtab_cmd.strsize
+                    // {
+                    //     symbol_offset =
+                    //         symtab_cmd.symoff + (each * std::mem::size_of::<Nlist64>() as u32);
+                    // } else {
+                    //     logs::error_log("Symbol offset out of bounds");
+                    //     continue;
+                    // }
                     // one symtab entry
                     let read_symbol_offset =
-                        utils::read_addr(task, symbol_offset as u64, symtab_cmd.cmdsize);
+                        utils::read_addr(task, symbol_offset, symtab_cmd.cmdsize);
                     if read_symbol_offset % std::mem::align_of::<Nlist64>() != 0 {
                         logs::error_log(&format!(
                             "Misaligned symbol offset: 0x{:x}",
@@ -237,23 +264,6 @@ pub fn parse_bin_file(
                     }
                 }
                 println!("{:?}", symtab_cmd);
-            }
-            if i.cmd == 25 {
-                let lc_symtab_offset_index = offset_map.iter().position(|x| x.0 == 25);
-                // get the value corresponding to the index
-                let lc_symtab_offset = offset_map[1].1;
-                // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
-                // to read the lc_symtab command properties
-                let read_lc_symtab_offset =
-                    utils::read_addr(task, lc_symtab_offset as u64, i.cmdsize);
-                let lc_segment: SegmentCommand64 =
-                    unsafe { std::ptr::read(read_lc_symtab_offset as *const SegmentCommand64) };
-                let mut segment_name: String = String::new();
-                for each in lc_segment.segname.iter() {
-                    if *each != 0 {
-                        segment_name.push(*each as char);
-                    }
-                }
             }
         }
     }
@@ -270,10 +280,6 @@ pub fn parse_bin_file(
         } else {
             each.n_value
         };
-        // println!(
-        //     "Base Addr: {:#x}, n_value: {:#x}, Calculated Addr: {:#x}",
-        //     base_addr, each.n_value, dyn_sym_off
-        // );
         filter_symtab.push(dyn_sym_off);
     }
 
