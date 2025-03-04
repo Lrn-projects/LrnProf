@@ -111,7 +111,6 @@ pub fn parse_bin_file(
     // convert into the MachHeader64 struct
     let header: MachHeader64 = unsafe { std::ptr::read(base_addr_buffer as *const MachHeader64) };
 
-    println!("{:?}", header);
     // init symtab command instance
     let mut symtab_cmd: SymtabCommand = SymtabCommand {
         cmd: 0,
@@ -124,10 +123,6 @@ pub fn parse_bin_file(
 
     // create a vector containing all symtab entries
     let mut symtab_vec: Vec<Nlist64> = Vec::new();
-
-    //TODO
-    //remove
-    let bytes_vec = Vec::new();
 
     // read the magic number of the binary to find the magic
     // match the binary magic in little endian
@@ -205,19 +200,38 @@ pub fn parse_bin_file(
                 // get the offset_map index matching the symtab int
                 let lc_symtab_offset_index = offset_map.iter().position(|x| x.0 == 2);
                 // get the value corresponding to the index
-                let lc_symtab_offset = offset_map[6].1;
+                let lc_symtab_offset = offset_map[lc_symtab_offset_index.unwrap()].1;
                 // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
                 // to read the lc_symtab command properties
-                symtab_cmd = unsafe { std::ptr::read(lc_symtab_offset as *const _) };
+                let read_lc_symtab_offset =
+                    utils::read_addr(task, lc_symtab_offset as u64, i.cmdsize);
+                symtab_cmd =
+                    unsafe { std::ptr::read(read_lc_symtab_offset as *const SymtabCommand) };
                 // loop over the all symtab to get all entries
-                for i in 0..symtab_cmd.nsyms {
+                for each in 0..symtab_cmd.nsyms {
                     // offset of one symtab entry
-                    let symbol_offset =
-                        symtab_cmd.symoff + (i * std::mem::size_of::<Nlist64>() as u32);
+                    let symbol_offset: u32;
+                    if symtab_cmd.symoff + (each * std::mem::size_of::<Nlist64>() as u32)
+                        < symtab_cmd.stroff + symtab_cmd.strsize
+                    {
+                        symbol_offset =
+                            symtab_cmd.symoff + (each * std::mem::size_of::<Nlist64>() as u32);
+                    } else {
+                        logs::error_log("Symbol offset out of bounds");
+                        continue;
+                    }
                     // one symtab entry
-                    let symtab: Nlist64 = unsafe {
-                        std::ptr::read(bytes_vec[symbol_offset as usize..].as_ptr() as *const _)
-                    };
+                    let read_symbol_offset =
+                        utils::read_addr(task, symbol_offset as u64, symtab_cmd.cmdsize);
+                    if read_symbol_offset % std::mem::align_of::<Nlist64>() != 0 {
+                        logs::error_log(&format!(
+                            "Misaligned symbol offset: 0x{:x}",
+                            read_symbol_offset
+                        ));
+                        continue;
+                    }
+                    let symtab: Nlist64 =
+                        unsafe { std::ptr::read(read_symbol_offset as usize as *const Nlist64) };
                     if symtab.n_strx != 0 {
                         symtab_vec.push(symtab);
                     }
@@ -230,21 +244,22 @@ pub fn parse_bin_file(
                 let lc_symtab_offset = offset_map[1].1;
                 // cast the SymtabCommand struct from the load_commands_bytes vector using the offset index
                 // to read the lc_symtab command properties
+                let read_lc_symtab_offset =
+                    utils::read_addr(task, lc_symtab_offset as u64, i.cmdsize);
                 let lc_segment: SegmentCommand64 =
-                    unsafe { std::ptr::read(lc_symtab_offset as *const _) };
+                    unsafe { std::ptr::read(read_lc_symtab_offset as *const SegmentCommand64) };
                 let mut segment_name: String = String::new();
                 for each in lc_segment.segname.iter() {
                     if *each != 0 {
                         segment_name.push(*each as char);
                     }
                 }
-                println!("{:?}", lc_segment)
             }
         }
     }
     // create a buffer containing all string table element
     let string_table =
-        &bytes_vec[symtab_cmd.stroff as usize..(symtab_cmd.stroff + symtab_cmd.strsize) as usize];
+        symtab_cmd.stroff as usize..(symtab_cmd.stroff + symtab_cmd.strsize) as usize;
 
     let mut filter_symtab: Vec<u64> = Vec::new();
     // loop over each symtab entries and resolve each symbols
