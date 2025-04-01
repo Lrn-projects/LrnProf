@@ -218,7 +218,7 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                         segment_name.push(*each as char);
                     }
                 }
-                // println!("{}", segment_name)
+                println!("{}", segment_name)
             }
         }
     }
@@ -235,10 +235,6 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
         } else {
             each.n_value
         };
-        // println!(
-        //     "Base Addr: {:#x}, n_value: {:#x}, Calculated Addr: {:#x}",
-        //     base_addr, each.n_value, dyn_sym_off
-        // );
         filter_symtab.push(dyn_sym_off);
     }
 
