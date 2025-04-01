@@ -218,29 +218,30 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                         segment_name.push(*each as char);
                     }
                 }
-                println!("{}", segment_name)
             }
         }
     }
     // create a buffer containing all string table element
     let string_table =
         &bytes_vec[symtab_cmd.stroff as usize..(symtab_cmd.stroff + symtab_cmd.strsize) as usize];
-
+    // filter the symtab with the correct dynamic offset
     let mut filter_symtab: Vec<u64> = Vec::new();
     // loop over each symtab entries and resolve each symbols
     for each in &symtab_vec {
         let strx_offset = each.n_strx as usize;
         let dyn_sym_off = if base_addr != 0 {
-            each.n_value
+            base_addr as usize + strx_offset
         } else {
-            each.n_value
+            0
         };
-        filter_symtab.push(dyn_sym_off);
+        if dyn_sym_off != 0 {
+            filter_symtab.push(dyn_sym_off.try_into().unwrap());
+        };
     }
-
-    for addr in addresses {
+    for addr in addresses { 
         for &sym_addr in &filter_symtab {
-            if addr == sym_addr {
+            if sym_addr <= addr && addr == sym_addr {
+                println!("it's working !");
                 // symbol name in string
                 let mut symbol_name = String::new();
                 let mut i = addr as usize;
@@ -249,7 +250,7 @@ pub fn parse_bin_file(pid: i32, addresses: Vec<u64>, base_addr: u64, readable_ba
                     symbol_name.push(string_table[i] as char);
                     i += 1;
                 }
-                if symbol_name != "" {
+                if !symbol_name.is_empty() {
                     let symbol_name_demangle = Name::from(symbol_name);
                     if symbol_name_demangle.detect_language() != Language::Unknown {
                         println!(
